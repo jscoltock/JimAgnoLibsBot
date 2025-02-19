@@ -82,9 +82,6 @@ def summarize_url(url, api_key):
 if __name__ == "__main__":
     # Get API key from environment variable
     api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        print("Error: GOOGLE_API_KEY not found in environment variables")
-        exit(1)
     
     # Get URL from user input
     url = input("Enter the URL to summarize: ")
