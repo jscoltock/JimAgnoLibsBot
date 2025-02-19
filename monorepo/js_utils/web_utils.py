@@ -1,3 +1,6 @@
+# MOTE: the web search assumes an llm with large context window like gemini. Other models may not
+# accept the context window size required to summarize the web search.
+
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict
