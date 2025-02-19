@@ -2,6 +2,11 @@ import requests
 from bs4 import BeautifulSoup
 from agno.agent import Agent
 from agno.models.google import Gemini
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def extract_text_from_url(url):
     """
@@ -74,10 +79,16 @@ def summarize_url(url, api_key):
         return text
     return generate_summary(text, api_key)
 
-# # Example usage:
-api_key = "AIzaSyAs8OV7InA2A1bNnTVvhJiaioAiylIAuYQ"  # Replace with your Google API key
-url = "https://www.cnn.com/2025/02/19/economy/trump-inflation-is-back/index.html"
-summary = summarize_url(url, api_key)
-print(summary)
+if __name__ == "__main__":
+    # Get API key from environment variable
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        print("Error: GOOGLE_API_KEY not found in environment variables")
+        exit(1)
+    
+    # Get URL from user input
+    url = input("Enter the URL to summarize: ")
+    summary = summarize_url(url, api_key)
+    print(summary)
 
 #print(extract_text_from_url("https://www.cnn.com/2025/02/19/economy/trump-inflation-is-back/index.html"))
