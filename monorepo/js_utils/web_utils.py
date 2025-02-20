@@ -1,5 +1,12 @@
-# MOTE: the web search assumes an llm with large context window like gemini. Other models may not
-# accept the context window size required to summarize the web search.
+"""
+This file contains three main functions that work together to perform web research and summarization: 
+extract_text_from_url() scrapes and cleans text content from a given webpage, 
+search_searxng() performs web searches using a local SearXNG instance and returns URLs with descriptions, 
+and summarize_web_search() combines these functions by searching for a query, extracting text from the found URLs, 
+and using Gemini to generate a summary of the collected web content.
+NOTE: the web search assumes an llm with large context window like gemini. Other models may not
+ accept the context window size required to summarize the web search.
+"""
 
 import requests
 from bs4 import BeautifulSoup

@@ -1,3 +1,18 @@
+"""
+This is a command-line chatbot application that uses Gemini (via agno) with persistent memory storage in SQLite. 
+It allows users to create new chat sessions or continue existing ones, with each session's history stored in a SQLite database. 
+The app includes a context management system that automatically summarizes older messages when approaching the token limit
+ (800K tokens), ensuring continuous operation during long conversations. The chatbot maintains session summaries and 
+ conversation history, making it possible to resume previous conversations while keeping track of discussed topics.
+ 
+Key components:
+Storage: SQLite for persistent session storage
+Model: Gemini for chat responses
+Memory: AgentMemory for conversation history and summarization
+Session Management: Ability to create new or select existing chat sessions
+Context Management: Automatic summarization of old messages when nearing token limits
+"""
+
 from agno.agent import Agent, AgentMemory
 from agno.models.google import Gemini
 from agno.storage.agent.sqlite import SqliteAgentStorage
