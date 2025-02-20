@@ -1,9 +1,9 @@
 from agno.agent import Agent, AgentMemory
 from agno.models.google import Gemini
 from agno.storage.agent.sqlite import SqliteAgentStorage
-from agno.memory.summarizer import MemorySummarizer
+from agno.memory.summarizer import MemorySummarizer  
 from pathlib import Path
-from rich.console import Console
+#from rich.console import Console
 import typer
 
 # Get the current directory
@@ -36,7 +36,8 @@ def create_agent(session_id: str = None, session_name: str = None):
         markdown=True,
     )
 
-console = Console()
+# TODO: console is used for rich output and formatting, but it's not used in the code.
+#console = Console()
 
 def handle_session_selection():
     """Handle session selection and return the selected session ID."""
