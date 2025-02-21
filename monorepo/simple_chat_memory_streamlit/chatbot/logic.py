@@ -19,54 +19,7 @@ class ChatbotManager:
             db_file=str(Path(__file__).parent.parent / "chat_storage.db")
         )
     
-    def create_session(self, session_name: str) -> dict:
-        """Create a new chat session
-        
-        Args:
-            session_name: Name for the new session
-            
-        Returns:
-            dict: Session information including agent
-        """
-        agent = self._create_agent(None, session_name)
-        return {
-            "session_id": agent.session_id,
-            "name": session_name,
-            "agent": agent
-        }
-    
-    def get_session(self, session_id: str) -> dict:
-        """Get an existing chat session
-        
-        Args:
-            session_id: ID of the session to retrieve
-            
-        Returns:
-            dict: Session information including agent
-        """
-        agent = self._create_agent(session_id)
-        return {
-            "session_id": session_id,
-            "name": agent.session_name,
-            "agent": agent
-        }
-    
-    def list_sessions(self) -> list[dict]:
-        """Get all available sessions
-        
-        Returns:
-            list[dict]: List of session information
-        """
-        sessions = self.storage.get_all_sessions()
-        return [
-            {
-                "session_id": session.session_id,
-                "name": session.session_data.get("session_name", "Unnamed")
-            }
-            for session in sessions
-        ]
-    
-    def _create_agent(self, session_id: str = None, session_name: str = None) -> Agent:
+    def create_agent(self, session_id: str = None, session_name: str = None) -> Agent:
         """Create and return a configured chatbot agent"""
         memory = AgentMemory(
             create_session_summary=True,
@@ -89,6 +42,10 @@ class ChatbotManager:
             agent.load_session()
             
         return agent
+    
+    def list_sessions(self) -> list:
+        """Get all available sessions"""
+        return self.storage.get_all_sessions()
     
     def manage_context(self, agent: Agent) -> None:
         """Check token usage and manage context window by summarizing older messages if needed"""
