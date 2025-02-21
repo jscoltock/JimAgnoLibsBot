@@ -73,10 +73,16 @@ class ChatbotUI:
             with st.chat_message("user"):
                 st.markdown(prompt)
             
-            # Get and display bot response
+            # Get and display bot response with streaming
             with st.chat_message("assistant"):
-                response = agent.run(prompt)
-                st.markdown(response.content)
+                message_placeholder = st.empty()
+                full_response = ""
+                # Stream the response
+                for response in agent.run(prompt, stream=True):
+                    if response.content:
+                        full_response += response.content
+                        message_placeholder.markdown(full_response + "▌")
+                message_placeholder.markdown(full_response)
             
             # Manage context after each interaction
             self.manager.manage_context(agent) 
