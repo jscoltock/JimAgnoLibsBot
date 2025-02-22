@@ -42,6 +42,7 @@ class ChatbotManager:
             session_id=session_id,
             session_name=session_name,
             add_history_to_messages=True,
+            num_history_responses=None,
             description="You are a helpful assistant that always responds in a polite, upbeat and positive manner.",
             markdown=True,
         )
