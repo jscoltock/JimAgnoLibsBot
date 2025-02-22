@@ -30,15 +30,15 @@ class ChatbotManager:
     
     def create_agent(self, session_id: str = None, session_name: str = None) -> Agent:
         """Create and return a configured chatbot agent"""
-        memory = AgentMemory(
-            create_session_summary=True,
-            update_session_summary_after_run=False,
-        )
+        # memory = AgentMemory(
+        #     create_session_summary=False,
+        #     update_session_summary_after_run=False,
+        # )
         
         agent = Agent(
             model=Gemini(id="gemini-2.0-flash-exp"),
             storage=self.storage,
-            memory=memory,
+            #memory=memory,
             session_id=session_id,
             session_name=session_name,
             add_history_to_messages=True,
