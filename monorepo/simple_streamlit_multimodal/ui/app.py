@@ -6,9 +6,14 @@ import streamlit as st
 import sys
 from pathlib import Path
 import os
+import tempfile
 sys.path.append(str(Path(__file__).parent.parent))
 from chatbot.logic import ChatbotManager
 from agno.media import Audio, Image, Video
+
+# Create a temp directory for video files
+TEMP_VIDEO_DIR = Path(tempfile.gettempdir()) / "agno_videos"
+TEMP_VIDEO_DIR.mkdir(exist_ok=True)
 
 class ChatbotUI:
     def __init__(self):
@@ -21,6 +26,8 @@ class ChatbotUI:
             st.session_state.uploaded_files = []
         if "last_upload_id" not in st.session_state:
             st.session_state.last_upload_id = None
+        if "temp_video_paths" not in st.session_state:
+            st.session_state.temp_video_paths = []
             
     @staticmethod
     def handle_file_upload():
@@ -125,11 +132,25 @@ class ChatbotUI:
             'audio': []
         }
         
+        # Clean up old temp video files
+        for path in st.session_state.temp_video_paths:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
+        st.session_state.temp_video_paths = []
+        
         for file in st.session_state.uploaded_files:
             if file['type'] == 'image':
                 media_objects['images'].append(Image(content=file['data']))
             elif file['type'] == 'video':
-                media_objects['videos'].append(Video(content=file['data']))
+                # Save video to temp file
+                temp_path = TEMP_VIDEO_DIR / f"{hash(file['name'])}{Path(file['name']).suffix}"
+                with open(temp_path, 'wb') as f:
+                    f.write(file['data'])
+                media_objects['videos'].append(Video(filepath=str(temp_path)))
+                st.session_state.temp_video_paths.append(str(temp_path))
             elif file['type'] == 'audio':
                 media_objects['audio'].append(Audio(content=file['data']))
                 
