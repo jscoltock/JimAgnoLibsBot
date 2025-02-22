@@ -134,12 +134,16 @@ class ChatbotUI:
                 name = session.session_data.get("session_name", "Unnamed") if session.session_data else "Unnamed"
                 session_options.append(f"{name} ({session.session_id})")
         
-        # Show session selector
-        selected_option = st.sidebar.selectbox(
-            "Choose a session",
-            session_options,
-            key="session_selector"
-        )
+        # Create columns for session selector and delete button
+        col1, col2 = st.sidebar.columns([3, 1])
+        
+        # Show session selector in first column
+        with col1:
+            selected_option = st.selectbox(
+                "Choose a session",
+                session_options,
+                key="session_selector"
+            )
         
         # Handle session selection
         if selected_option == "New Session":
@@ -154,6 +158,39 @@ class ChatbotUI:
         else:
             session_id = selected_option.split("(")[-1].rstrip(")")
             session_name = selected_option.split(" (")[0]
+            
+            # Show delete button in second column when a session is selected
+            with col2:
+                st.write("")  # Add some spacing to align with selectbox
+                if st.button("🗑️", help="Delete this session", type="secondary", key="delete_button"):
+                    # Show confirmation dialog
+                    st.session_state.show_delete_confirm = True
+                    
+            # Handle delete confirmation
+            if st.session_state.get('show_delete_confirm', False):
+                with st.sidebar.expander("⚠️ Confirm Deletion", expanded=True):
+                    st.warning(f"Are you sure you want to delete session '{session_name}'?")
+                    st.write("This action cannot be undone.")
+                    col3, col4 = st.columns([1, 1])
+                    with col3:
+                        if st.button("Yes, Delete", type="primary", key="confirm_delete"):
+                            try:
+                                # Delete the session
+                                self.manager.delete_session(session_id)
+                                st.success("Session deleted successfully!")
+                                # Clear session state
+                                st.session_state.current_session_id = None
+                                st.session_state.agent = None
+                                st.session_state.last_session = None
+                                st.session_state.show_delete_confirm = False
+                                # Force reload to show updated session list
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error deleting session: {str(e)}")
+                    with col4:
+                        if st.button("Cancel", type="secondary", key="cancel_delete"):
+                            st.session_state.show_delete_confirm = False
+                            st.rerun()
             
             if "last_session" not in st.session_state or st.session_state.last_session != session_id:
                 st.session_state.last_session = session_id

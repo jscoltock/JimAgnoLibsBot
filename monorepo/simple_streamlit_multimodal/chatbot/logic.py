@@ -7,12 +7,19 @@ from agno.models.google import Gemini
 from agno.storage.agent.sqlite import SqliteAgentStorage
 from agno.memory.summarizer import MemorySummarizer
 from pathlib import Path
+import logging
+import sqlite3
 from .media_manager import MediaManager
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class ChatbotManager:
     def __init__(self):
         self.storage = self._init_storage()
         self.media_manager = MediaManager()
+        self.db_path = Path(__file__).parent.parent / "chat_storage.db"
         
     def _init_storage(self):
         """Initialize and return agent storage for session management"""
@@ -51,11 +58,22 @@ class ChatbotManager:
     
     def delete_session(self, session_id: str) -> None:
         """Delete a session and its associated media files"""
-        # Delete media files first
-        self.media_manager.cleanup_session(session_id)
-        # Delete session from storage
-        if self.storage:
-            self.storage.delete_session(session_id)
+        logger.debug(f"Starting deletion of session {session_id}")
+        
+        try:
+            # Delete media files first
+            logger.debug("Attempting to delete media files...")
+            self.media_manager.cleanup_session(session_id)
+            logger.debug("Media files deleted successfully")
+            
+            # Delete session using Agno storage
+            logger.debug("Attempting to delete session from database...")
+            self.storage.delete_session(session_id=session_id)
+            logger.debug("Session deleted from database successfully")
+                
+        except Exception as e:
+            logger.error(f"Error during session deletion: {str(e)}", exc_info=True)
+            raise
     
     def manage_context(self, agent: Agent) -> None:
         """Check token usage and manage context window by summarizing older messages if needed"""
