@@ -205,21 +205,34 @@ class ChatbotUI:
             
         # Display messages from agent memory
         if agent.memory and agent.memory.messages:
-            for msg in agent.memory.messages:
-                with st.chat_message(msg.role):
-                    st.markdown(msg.content)
-                    # Display media if present in message metadata
-                    if hasattr(msg, 'metadata') and msg.metadata and 'media_refs' in msg.metadata:
-                        with st.expander("📎 View Media", expanded=False):
-                            for media_ref in msg.metadata['media_refs']:
-                                stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
-                                st.write(f"**{media_ref['original_name']}**")
-                                if media_ref['type'] == 'image':
-                                    st.image(str(stored_path))
-                                elif media_ref['type'] == 'video':
-                                    st.video(str(stored_path))
-                                elif media_ref['type'] == 'audio':
-                                    st.audio(str(stored_path))
+            for idx, msg in enumerate(agent.memory.messages):
+                # Create columns for message and delete button
+                msg_col, del_col = st.columns([20, 1])
+                
+                with msg_col:
+                    with st.chat_message(msg.role):
+                        st.markdown(msg.content)
+                        # Display media if present in message metadata
+                        if hasattr(msg, 'metadata') and msg.metadata and 'media_refs' in msg.metadata:
+                            with st.expander("📎 View Media", expanded=False):
+                                for media_ref in msg.metadata['media_refs']:
+                                    stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                                    st.write(f"**{media_ref['original_name']}**")
+                                    if media_ref['type'] == 'image':
+                                        st.image(str(stored_path))
+                                    elif media_ref['type'] == 'video':
+                                        st.video(str(stored_path))
+                                    elif media_ref['type'] == 'audio':
+                                        st.audio(str(stored_path))
+                
+                # Show delete button for the message
+                with del_col:
+                    if st.button("🗑️", key=f"delete_msg_{idx}", help="Delete this message"):
+                        # Remove message from memory
+                        agent.memory.messages.pop(idx)
+                        # Update session in storage
+                        agent.write_to_storage()
+                        st.rerun()
         
         # Display uploaded files in a collapsible section right before chat input
         if st.session_state.uploaded_files:
