@@ -173,14 +173,16 @@ class ChatbotUI:
                     st.markdown(msg.content)
                     # Display media if present in message metadata
                     if hasattr(msg, 'metadata') and msg.metadata and 'media_refs' in msg.metadata:
-                        for media_ref in msg.metadata['media_refs']:
-                            stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
-                            if media_ref['type'] == 'image':
-                                st.image(str(stored_path))
-                            elif media_ref['type'] == 'video':
-                                st.video(str(stored_path))
-                            elif media_ref['type'] == 'audio':
-                                st.audio(str(stored_path))
+                        with st.expander("📎 View Media", expanded=False):
+                            for media_ref in msg.metadata['media_refs']:
+                                stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                                st.write(f"**{media_ref['original_name']}**")
+                                if media_ref['type'] == 'image':
+                                    st.image(str(stored_path))
+                                elif media_ref['type'] == 'video':
+                                    st.video(str(stored_path))
+                                elif media_ref['type'] == 'audio':
+                                    st.audio(str(stored_path))
         
         # Display uploaded files in a collapsible section right before chat input
         if st.session_state.uploaded_files:
@@ -206,14 +208,16 @@ class ChatbotUI:
                 st.markdown(prompt)
                 # Display media files
                 if media_objects['media_refs']:
-                    for media_ref in media_objects['media_refs']:
-                        stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
-                        if media_ref['type'] == 'image':
-                            st.image(str(stored_path))
-                        elif media_ref['type'] == 'video':
-                            st.video(str(stored_path))
-                        elif media_ref['type'] == 'audio':
-                            st.audio(str(stored_path))
+                    with st.expander("📎 View Media", expanded=True):
+                        for media_ref in media_objects['media_refs']:
+                            stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                            st.write(f"**{media_ref['original_name']}**")
+                            if media_ref['type'] == 'image':
+                                st.image(str(stored_path))
+                            elif media_ref['type'] == 'video':
+                                st.video(str(stored_path))
+                            elif media_ref['type'] == 'audio':
+                                st.audio(str(stored_path))
             
             # Get and display bot response with streaming
             with st.chat_message("assistant"):
