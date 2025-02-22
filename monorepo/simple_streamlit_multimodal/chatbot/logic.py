@@ -7,10 +7,12 @@ from agno.models.google import Gemini
 from agno.storage.agent.sqlite import SqliteAgentStorage
 from agno.memory.summarizer import MemorySummarizer
 from pathlib import Path
+from .media_manager import MediaManager
 
 class ChatbotManager:
     def __init__(self):
         self.storage = self._init_storage()
+        self.media_manager = MediaManager()
         
     def _init_storage(self):
         """Initialize and return agent storage for session management"""
@@ -46,6 +48,14 @@ class ChatbotManager:
     def list_sessions(self) -> list:
         """Get all available sessions"""
         return self.storage.get_all_sessions()
+    
+    def delete_session(self, session_id: str) -> None:
+        """Delete a session and its associated media files"""
+        # Delete media files first
+        self.media_manager.cleanup_session(session_id)
+        # Delete session from storage
+        if self.storage:
+            self.storage.delete_session(session_id)
     
     def manage_context(self, agent: Agent) -> None:
         """Check token usage and manage context window by summarizing older messages if needed"""

@@ -60,3 +60,6 @@ audio_generations
 token.json
 
 .composio.lock
+
+# Media storage
+monorepo/simple_streamlit_multimodal/media_storage

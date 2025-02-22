@@ -28,12 +28,15 @@ class ChatbotUI:
             st.session_state.last_upload_id = None
         if "temp_video_paths" not in st.session_state:
             st.session_state.temp_video_paths = []
+        if "media_refs" not in st.session_state:
+            st.session_state.media_refs = []
             
     @staticmethod
     def handle_file_upload():
         """Callback to handle file upload changes"""
         # Clear existing files first
         st.session_state.uploaded_files = []
+        st.session_state.media_refs = []
         
         # Process new files if any
         if st.session_state.file_uploader:
@@ -61,15 +64,49 @@ class ChatbotUI:
         elif extension in ['.mp3', '.wav']:
             return 'audio'
         return None
-        
-    def save_uploaded_file(self, uploaded_file):
-        """Store uploaded file data in session state"""
-        return {
-            'name': uploaded_file.name,
-            'data': uploaded_file.getvalue(),
-            'type': self.get_file_type(uploaded_file)
+    
+    def get_media_objects(self):
+        """Convert uploaded files to Agno media objects"""
+        media_objects = {
+            'images': [],
+            'videos': [],
+            'audio': [],
+            'media_refs': []  # Store references for persistence
         }
+        
+        # Clean up old temp video files
+        for path in st.session_state.temp_video_paths:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
+        st.session_state.temp_video_paths = []
+        
+        # Store and process each file
+        for file in st.session_state.uploaded_files:
+            # Store media file and get reference
+            media_ref = self.manager.media_manager.store_media(
+                st.session_state.current_session_id or 'temp', 
+                file
+            )
+            media_objects['media_refs'].append(media_ref)
             
+            # Get the full path for the stored file
+            stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+            
+            # Create appropriate media object
+            if file['type'] == 'image':
+                media_objects['images'].append(Image(filepath=str(stored_path)))
+            elif file['type'] == 'video':
+                media_objects['videos'].append(Video(filepath=str(stored_path)))
+            elif file['type'] == 'audio':
+                media_objects['audio'].append(Audio(filepath=str(stored_path)))
+                
+        # Save media references to session state
+        st.session_state.media_refs = media_objects['media_refs']
+        return media_objects
+    
     def render_session_selector(self) -> tuple[str, str]:
         """Render session selection UI and return selected session info"""
         st.sidebar.title("Session Management")
@@ -124,38 +161,6 @@ class ChatbotUI:
             
             return session_id, session_name
     
-    def get_media_objects(self):
-        """Convert uploaded files to Agno media objects"""
-        media_objects = {
-            'images': [],
-            'videos': [],
-            'audio': []
-        }
-        
-        # Clean up old temp video files
-        for path in st.session_state.temp_video_paths:
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except Exception:
-                pass
-        st.session_state.temp_video_paths = []
-        
-        for file in st.session_state.uploaded_files:
-            if file['type'] == 'image':
-                media_objects['images'].append(Image(content=file['data']))
-            elif file['type'] == 'video':
-                # Save video to temp file
-                temp_path = TEMP_VIDEO_DIR / f"{hash(file['name'])}{Path(file['name']).suffix}"
-                with open(temp_path, 'wb') as f:
-                    f.write(file['data'])
-                media_objects['videos'].append(Video(filepath=str(temp_path)))
-                st.session_state.temp_video_paths.append(str(temp_path))
-            elif file['type'] == 'audio':
-                media_objects['audio'].append(Audio(content=file['data']))
-                
-        return media_objects
-    
     def render_chat(self, agent):
         """Render chat interface for the given agent"""
         if not agent:
@@ -166,6 +171,16 @@ class ChatbotUI:
             for msg in agent.memory.messages:
                 with st.chat_message(msg.role):
                     st.markdown(msg.content)
+                    # Display media if present in message metadata
+                    if hasattr(msg, 'metadata') and msg.metadata and 'media_refs' in msg.metadata:
+                        for media_ref in msg.metadata['media_refs']:
+                            stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                            if media_ref['type'] == 'image':
+                                st.image(str(stored_path))
+                            elif media_ref['type'] == 'video':
+                                st.video(str(stored_path))
+                            elif media_ref['type'] == 'audio':
+                                st.audio(str(stored_path))
         
         # Display uploaded files in a collapsible section right before chat input
         if st.session_state.uploaded_files:
@@ -175,7 +190,7 @@ class ChatbotUI:
                     with cols[idx % 3]:
                         st.write(f"**{file['name']}**")
                         if file['type'] == 'image':
-                            st.image(file['data'], use_container_width=True)
+                            st.image(file['data'])
                         elif file['type'] == 'video':
                             st.video(file['data'])
                         elif file['type'] == 'audio':
@@ -183,24 +198,39 @@ class ChatbotUI:
         
         # Chat input
         if prompt := st.chat_input("Type your message here..."):
-            # Display user message
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            
             # Get media objects for the query
             media_objects = self.get_media_objects()
+            
+            # Display user message with media
+            with st.chat_message("user"):
+                st.markdown(prompt)
+                # Display media files
+                if media_objects['media_refs']:
+                    for media_ref in media_objects['media_refs']:
+                        stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                        if media_ref['type'] == 'image':
+                            st.image(str(stored_path))
+                        elif media_ref['type'] == 'video':
+                            st.video(str(stored_path))
+                        elif media_ref['type'] == 'audio':
+                            st.audio(str(stored_path))
             
             # Get and display bot response with streaming
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
                 full_response = ""
+                
+                # Add media references to message metadata
+                metadata = {'media_refs': media_objects['media_refs']} if media_objects['media_refs'] else None
+                
                 # Stream the response with media objects
                 for response in agent.run(
                     prompt,
                     stream=True,
                     images=media_objects['images'],
                     videos=media_objects['videos'],
-                    audio=media_objects['audio']
+                    audio=media_objects['audio'],
+                    metadata=metadata  # Add metadata to the message
                 ):
                     if response.content:
                         full_response += response.content
