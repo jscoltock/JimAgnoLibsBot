@@ -331,4 +331,4 @@ class ChatbotUI:
                 message_placeholder.markdown(full_response)
             
             # Manage context after each interaction
-            self.manager.manage_context(agent) 
+            #self.manager.manage_context(agent) 
