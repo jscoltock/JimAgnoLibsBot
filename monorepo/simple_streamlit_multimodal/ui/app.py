@@ -31,6 +31,26 @@ class ChatbotUI:
         if "media_refs" not in st.session_state:
             st.session_state.media_refs = []
             
+    def _save_last_session(self, session_id: str):
+        """Save the last used session ID to a file"""
+        try:
+            with open("last_session.txt", "w") as f:
+                f.write(session_id if session_id else "")
+        except Exception:
+            # Silently fail if we can't write the file
+            pass
+            
+    def _load_last_session(self) -> str:
+        """Load the last used session ID from file"""
+        try:
+            if not os.path.exists("last_session.txt"):
+                return None
+            with open("last_session.txt", "r") as f:
+                session_id = f.read().strip()
+                return session_id if session_id else None
+        except Exception:
+            return None
+        
     @staticmethod
     def handle_file_upload():
         """Callback to handle file upload changes"""
@@ -129,10 +149,24 @@ class ChatbotUI:
         
         # Create session options
         session_options = ["New Session"]
+        session_id_to_name = {}
         if existing_sessions:
             for session in existing_sessions:
                 name = session.session_data.get("session_name", "Unnamed") if session.session_data else "Unnamed"
-                session_options.append(f"{name} ({session.session_id})")
+                option = f"{name} ({session.session_id})"
+                session_options.append(option)
+                session_id_to_name[session.session_id] = name
+        
+        # Load last session
+        last_session_id = self._load_last_session()
+        default_index = 0
+        
+        # Find the index of the last session if it exists
+        if last_session_id and last_session_id in session_id_to_name:
+            last_session_name = session_id_to_name[last_session_id]
+            last_session_option = f"{last_session_name} ({last_session_id})"
+            if last_session_option in session_options:
+                default_index = session_options.index(last_session_option)
         
         # Create columns for session selector and delete button
         col1, col2 = st.sidebar.columns([3, 1])
@@ -142,6 +176,7 @@ class ChatbotUI:
             selected_option = st.selectbox(
                 "Choose a session",
                 session_options,
+                index=default_index,
                 key="session_selector"
             )
         
@@ -151,6 +186,7 @@ class ChatbotUI:
             if session_name.strip():
                 if "last_session" not in st.session_state or st.session_state.last_session != "new":
                     st.session_state.last_session = "new"
+                    self._save_last_session("")  # Clear last session when creating new
                     st.rerun()
                 return None, session_name.strip()
             st.sidebar.warning("Please enter a session name")
@@ -182,6 +218,8 @@ class ChatbotUI:
                                 st.session_state.current_session_id = None
                                 st.session_state.agent = None
                                 st.session_state.last_session = None
+                                # Clear the last session file
+                                self._save_last_session("")
                                 st.session_state.show_delete_confirm = False
                                 # Force reload to show updated session list
                                 st.rerun()
@@ -194,6 +232,7 @@ class ChatbotUI:
             
             if "last_session" not in st.session_state or st.session_state.last_session != session_id:
                 st.session_state.last_session = session_id
+                self._save_last_session(session_id)  # Save the selected session
                 st.rerun()
             
             return session_id, session_name
