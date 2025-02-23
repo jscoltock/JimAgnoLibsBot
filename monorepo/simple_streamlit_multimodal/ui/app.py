@@ -7,13 +7,17 @@ import sys
 from pathlib import Path
 import os
 import tempfile
+import json
 sys.path.append(str(Path(__file__).parent.parent))
 from chatbot.logic import ChatbotManager
 from agno.media import Audio, Image, Video
+import logging
 
 # Create a temp directory for video files
 TEMP_VIDEO_DIR = Path(tempfile.gettempdir()) / "agno_videos"
 TEMP_VIDEO_DIR.mkdir(exist_ok=True)
+
+logger = logging.getLogger(__name__)
 
 class ChatbotUI:
     def __init__(self):
@@ -292,6 +296,9 @@ class ChatbotUI:
             # Get media objects for the query
             media_objects = self.get_media_objects()
             
+            # Log conversation state before new message
+            self.manager._log_conversation_state(agent, "Before new message")
+            
             # Display user message with media
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -316,6 +323,16 @@ class ChatbotUI:
                 # Add media references to message metadata
                 metadata = {'media_refs': media_objects['media_refs']} if media_objects['media_refs'] else None
                 
+                # Log the message being sent to the model
+                logger.debug("Sending message to model:")
+                logger.debug(json.dumps({
+                    'prompt': prompt,
+                    'has_images': bool(media_objects['images']),
+                    'has_videos': bool(media_objects['videos']),
+                    'has_audio': bool(media_objects['audio']),
+                    'has_media_refs': bool(media_objects['media_refs'])
+                }, indent=2))
+                
                 # Stream the response with media objects
                 for response in agent.run(
                     prompt,
@@ -329,6 +346,9 @@ class ChatbotUI:
                         full_response += response.content
                         message_placeholder.markdown(full_response + "▌")
                 message_placeholder.markdown(full_response)
+                
+                # Log conversation state after response
+                self.manager._log_conversation_state(agent, "After model response")
             
             # Manage context after each interaction
             #self.manager.manage_context(agent) 

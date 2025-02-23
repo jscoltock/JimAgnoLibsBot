@@ -9,6 +9,7 @@ from agno.memory.summarizer import MemorySummarizer
 from pathlib import Path
 import logging
 import sqlite3
+import json
 from .media_manager import MediaManager
 
 # Set up logging
@@ -28,28 +29,50 @@ class ChatbotManager:
             db_file=str(Path(__file__).parent.parent / "chat_storage.db")
         )
     
+    def _log_conversation_state(self, agent: Agent, stage: str):
+        """Log the current state of the conversation"""
+        if not agent.memory or not agent.memory.messages:
+            logger.debug(f"{stage} - No messages in memory")
+            return
+            
+        messages = []
+        for msg in agent.memory.messages:
+            metadata = getattr(msg, 'metadata', {}) or {}
+            msg_dict = {
+                'role': msg.role,
+                'content': msg.content[:100] + '...' if len(msg.content) > 100 else msg.content,
+                'has_media': bool(metadata.get('media_refs', None))
+            }
+            messages.append(msg_dict)
+            
+        logger.debug(f"{stage} - Conversation state:")
+        logger.debug(json.dumps(messages, indent=2))
+    
     def create_agent(self, session_id: str = None, session_name: str = None) -> Agent:
         """Create and return a configured chatbot agent"""
-        # memory = AgentMemory(
-        #     create_session_summary=False,
-        #     update_session_summary_after_run=False,
-        # )
+        memory = AgentMemory(
+            create_session_summary=False,
+            update_session_summary_after_run=False,
+        )
         
         agent = Agent(
             model=Gemini(id="gemini-2.0-flash-exp"),
             storage=self.storage,
-            #memory=memory,
+            memory=memory,
             session_id=session_id,
             session_name=session_name,
             add_history_to_messages=True,
             num_history_responses=None,
             description="You are a helpful assistant that always responds in a polite, upbeat and positive manner.",
             markdown=True,
+            debug_mode=True
         )
         
         # Load existing session data if session_id is provided
         if session_id:
             agent.load_session()
+            logger.debug(f"Loaded session {session_id}")
+            self._log_conversation_state(agent, "After session load")
             
         return agent
     
