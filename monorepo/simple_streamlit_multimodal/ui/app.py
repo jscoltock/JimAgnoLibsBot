@@ -8,6 +8,7 @@ from pathlib import Path
 import os
 import tempfile
 import json
+import PyPDF2  # Add PyPDF2 import
 sys.path.append(str(Path(__file__).parent.parent))
 from chatbot.logic import ChatbotManager
 from agno.media import Audio, Image, Video
@@ -25,8 +26,31 @@ class ChatbotUI:
         self.initialize_session_state()
         
     @staticmethod
+    def extract_pdf_text(pdf_data):
+        """Helper function to extract text from PDF data"""
+        try:
+            # Create a PDF reader object
+            pdf_reader = PyPDF2.PdfReader(pdf_data)
+            
+            # Extract text from all pages
+            text = []
+            for page in pdf_reader.pages:
+                text.append(page.extract_text())
+                
+            return '\n'.join(text)
+        except Exception as e:
+            logger.error(f"Error extracting text from PDF: {str(e)}")
+            return f"Error extracting text from PDF: {str(e)}"
+
+    @staticmethod
     def safe_decode_text(content, filename):
         """Helper function to safely decode text content"""
+        # Check if it's a PDF file
+        if filename.lower().endswith('.pdf'):
+            from io import BytesIO
+            return ChatbotUI.extract_pdf_text(BytesIO(content))
+            
+        # Handle other text files
         encodings_to_try = ['utf-8', 'utf-16', 'ascii', 'iso-8859-1', 'cp1252']
         for encoding in encodings_to_try:
             try:
@@ -139,7 +163,7 @@ class ChatbotUI:
             return 'video'
         elif extension in ['.mp3', '.wav']:
             return 'audio'
-        elif extension in ['.txt']:
+        elif extension in ['.txt', '.pdf']:  # Add PDF to text types
             return 'text'
         return None
     
@@ -193,10 +217,10 @@ class ChatbotUI:
         st.sidebar.markdown("---")
         st.sidebar.subheader("Upload Files")
         
-        # File uploader with callback
+        # File uploader with callback - add PDF to accepted types
         _ = st.sidebar.file_uploader(
             "Choose files",
-            type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt'],
+            type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt', 'pdf'],
             accept_multiple_files=True,
             key="file_uploader",
             on_change=ChatbotUI.handle_file_upload
