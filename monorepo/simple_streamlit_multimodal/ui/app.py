@@ -24,6 +24,32 @@ class ChatbotUI:
         self.manager = ChatbotManager()
         self.initialize_session_state()
         
+    @staticmethod
+    def safe_decode_text(content, filename):
+        """Helper function to safely decode text content"""
+        encodings_to_try = ['utf-8', 'utf-16', 'ascii', 'iso-8859-1', 'cp1252']
+        for encoding in encodings_to_try:
+            try:
+                return content.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        # If all encodings fail, use utf-8 with error handling
+        return content.decode('utf-8', errors='replace')
+
+    @staticmethod
+    def safe_read_text_file(filepath):
+        """Helper function to safely read text files"""
+        encodings_to_try = ['utf-8', 'utf-16', 'ascii', 'iso-8859-1', 'cp1252']
+        for encoding in encodings_to_try:
+            try:
+                with open(filepath, 'r', encoding=encoding) as f:
+                    return f.read()
+            except UnicodeDecodeError:
+                continue
+        # If all encodings fail, use utf-8 with error handling
+        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+            return f.read()
+        
     def initialize_session_state(self):
         """Initialize session state variables"""
         if "uploaded_files" not in st.session_state:
@@ -87,6 +113,8 @@ class ChatbotUI:
             return 'video'
         elif extension in ['.mp3', '.wav']:
             return 'audio'
+        elif extension in ['.txt']:
+            return 'text'
         return None
     
     def get_media_objects(self):
@@ -142,7 +170,7 @@ class ChatbotUI:
         # File uploader with callback
         _ = st.sidebar.file_uploader(
             "Choose files",
-            type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav'],
+            type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt'],
             accept_multiple_files=True,
             key="file_uploader",
             on_change=ChatbotUI.handle_file_upload
@@ -267,6 +295,17 @@ class ChatbotUI:
                                         st.video(str(stored_path))
                                     elif media_ref['type'] == 'audio':
                                         st.audio(str(stored_path))
+                                    elif media_ref['type'] == 'text':
+                                        try:
+                                            text_content = self.safe_read_text_file(stored_path)
+                                            st.text_area(
+                                                "Text Content",
+                                                value=text_content[:500] + '...' if len(text_content) > 500 else text_content,
+                                                height=150,
+                                                disabled=True
+                                            )
+                                        except Exception as e:
+                                            st.error(f"Error displaying text content from {media_ref['original_name']}: {str(e)}")
                 
                 # Show delete button for the message
                 with del_col:
@@ -290,9 +329,33 @@ class ChatbotUI:
                             st.video(file['data'])
                         elif file['type'] == 'audio':
                             st.audio(file['data'])
+                        elif file['type'] == 'text':
+                            try:
+                                text_content = self.safe_decode_text(file['data'], file['name'])
+                                st.text_area(
+                                    "Text Content",
+                                    value=text_content[:500] + '...' if len(text_content) > 500 else text_content,
+                                    height=150,
+                                    disabled=True
+                                )
+                            except Exception as e:
+                                st.error(f"Error displaying text content from {file['name']}: {str(e)}")
         
         # Chat input
         if prompt := st.chat_input("Type your message here..."):
+            # Process text files and append their content to the prompt
+            text_contents = []
+            for file in st.session_state.uploaded_files:
+                if file['type'] == 'text':
+                    try:
+                        text_content = self.safe_decode_text(file['data'], file['name'])
+                        text_contents.append(f"\nContent from {file['name']}:\n{text_content}")
+                    except Exception as e:
+                        st.error(f"Error processing text content from {file['name']}: {str(e)}")
+            
+            if text_contents:
+                prompt = prompt + '\n' + '\n'.join(text_contents)
+            
             # Get media objects for the query
             media_objects = self.get_media_objects()
             
@@ -314,6 +377,17 @@ class ChatbotUI:
                                 st.video(str(stored_path))
                             elif media_ref['type'] == 'audio':
                                 st.audio(str(stored_path))
+                            elif media_ref['type'] == 'text':
+                                try:
+                                    text_content = self.safe_read_text_file(stored_path)
+                                    st.text_area(
+                                        "Text Content",
+                                        value=text_content[:500] + '...' if len(text_content) > 500 else text_content,
+                                        height=150,
+                                        disabled=True
+                                    )
+                                except Exception as e:
+                                    st.error(f"Error displaying text content from {media_ref['original_name']}: {str(e)}")
             
             # Get and display bot response with streaming
             with st.chat_message("assistant"):
