@@ -9,9 +9,13 @@ import os
 import tempfile
 import json
 import PyPDF2  # Add PyPDF2 import
+from datetime import datetime
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from js_utils.web_utils import summarize_web_search
 sys.path.append(str(Path(__file__).parent.parent))
 from chatbot.logic import ChatbotManager
 from agno.media import Audio, Image, Video
+from agno.agent import Message
 import logging
 
 # Create a temp directory for video files
@@ -110,6 +114,10 @@ class ChatbotUI:
             st.session_state.temp_video_paths = []
         if "media_refs" not in st.session_state:
             st.session_state.media_refs = []
+        if "use_web_search" not in st.session_state:
+            st.session_state.use_web_search = False
+        if "num_pages" not in st.session_state:
+            st.session_state.num_pages = 3
             
     def _save_last_session(self, session_id: str):
         """Save the last used session ID to a file"""
@@ -224,6 +232,19 @@ class ChatbotUI:
             accept_multiple_files=True,
             key="file_uploader",
             on_change=ChatbotUI.handle_file_upload
+        )
+        
+        # Add web search controls
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Web Search")
+        use_web_search = st.sidebar.checkbox("Use Web Search", value=False, key="use_web_search")
+        num_pages = st.sidebar.number_input(
+            "Number of Pages to Search",
+            min_value=1,
+            max_value=10,
+            value=3,
+            key="num_pages",
+            help="Number of web pages to search and summarize"
         )
         
         # Get available sessions
@@ -393,6 +414,45 @@ class ChatbotUI:
         
         # Chat input
         if prompt := st.chat_input("Type your message here..."):
+            # Check if web search is enabled
+            if st.session_state.use_web_search:
+                with st.spinner("Searching the web..."):
+                    # Add date and URL request to query
+                    current_date = datetime.now().strftime("%Y-%m-%d")
+                    web_query = f"Today's date is: {current_date}. {prompt} Include the source urls at the end of your summary."
+                    
+                    # Add user's query to memory
+                    user_message = Message(role="user", content=prompt)
+                    agent.memory.add_message(user_message)
+                    
+                    # Display user message
+                    with st.chat_message("user"):
+                        st.markdown(prompt)
+                    
+                    # Perform web search
+                    web_results = summarize_web_search(web_query, st.session_state.num_pages)
+                    
+                    # Add web search results to memory
+                    assistant_message = Message(role="assistant", content=web_results)
+                    agent.memory.add_message(assistant_message)
+                    
+                    # Display assistant message
+                    with st.chat_message("assistant"):
+                        preview, full_content = self.format_chat_message(web_results)
+                        if preview != full_content:
+                            st.markdown(preview)
+                            with st.expander("Show full response", expanded=False):
+                                st.markdown(full_content)
+                        else:
+                            st.markdown(full_content)
+                    
+                    # Save the updated memory to storage
+                    agent.write_to_storage()
+                    
+                    # Log conversation state after web search
+                    self.manager._log_conversation_state(agent, "After web search")
+                    return
+            
             # Process text files and append their content to the prompt
             text_contents = []
             for file in st.session_state.uploaded_files:

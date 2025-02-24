@@ -148,28 +148,28 @@ Content:
     return response.text
 
 
-############################ Example usage of all functions ###################################
+# ############################ Example usage of all functions ###################################
  
-print("Example of web search (returns URL's)")
-results = search_searxng("python programming", 3)
-for i, result in enumerate(results, 1):
-    print(result['url'])
-    print(result['description'])
+# print("Example of web search (returns URL's)")
+# results = search_searxng("python programming", 3)
+# for i, result in enumerate(results, 1):
+#     print(result['url'])
+#     print(result['description'])
 
-input()
+# input()
 
-print("Example of extracting text from a url")
-print(extract_text_from_url("https://www.cnn.com/2025/02/19/economy/trump-inflation-is-back/index.html"))
+# print("Example of extracting text from a url")
+# print(extract_text_from_url("https://www.cnn.com/2025/02/19/economy/trump-inflation-is-back/index.html"))
 
-input()
+# input()
 
-print("Example of iterating through results of web search and extracting text from each url")
-results = search_searxng("python programming", 3)
-for result in results:
-    print(extract_text_from_url(result['url']))
+# print("Example of iterating through results of web search and extracting text from each url")
+# results = search_searxng("python programming", 3)
+# for result in results:
+#     print(extract_text_from_url(result['url']))
 
-input() 
+# input() 
 
-print("Example of summarizing web search  (does web search, extracts text from each url, and summarizes the text using AI)")
-summary = summarize_web_search("What is the best coffee maker under $100?", 10)
-print(summary)
+# print("Example of summarizing web search  (does web search, extracts text from each url, and summarizes the text using AI)")
+# summary = summarize_web_search("What is the best coffee maker under $100?", 10)
+# print(summary)
