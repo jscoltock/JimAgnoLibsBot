@@ -49,6 +49,27 @@ class ChatbotUI:
         # If all encodings fail, use utf-8 with error handling
         with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
             return f.read()
+
+    @staticmethod
+    def format_chat_message(content: str, max_preview_length: int = 500) -> tuple[str, str]:
+        """Format chat message for display, returns (preview, full_content)"""
+        # If content is short enough, return as is
+        if len(content) <= max_preview_length:
+            return content, content
+            
+        # Create preview by truncating at the last complete sentence within limit
+        preview = content[:max_preview_length]
+        last_sentence = max(
+            preview.rfind('.'),
+            preview.rfind('!'),
+            preview.rfind('?')
+        )
+        if last_sentence > 0:
+            preview = content[:last_sentence + 1]
+        else:
+            preview = content[:max_preview_length] + "..."
+            
+        return preview, content
         
     def initialize_session_state(self):
         """Initialize session state variables"""
@@ -282,7 +303,15 @@ class ChatbotUI:
                 
                 with msg_col:
                     with st.chat_message(msg.role):
-                        st.markdown(msg.content)
+                        # Format and display message content
+                        preview, full_content = self.format_chat_message(msg.content)
+                        if preview != full_content:
+                            st.markdown(preview)
+                            with st.expander("Show full message", expanded=False):
+                                st.markdown(full_content)
+                        else:
+                            st.markdown(full_content)
+                            
                         # Display media if present in message metadata
                         if hasattr(msg, 'metadata') and msg.metadata and 'media_refs' in msg.metadata:
                             with st.expander("📎 View Media", expanded=False):
@@ -364,7 +393,32 @@ class ChatbotUI:
             
             # Display user message with media
             with st.chat_message("user"):
-                st.markdown(prompt)
+                # Display original prompt first
+                original_prompt = prompt.split("\nContent from")[0]
+                preview, full_content = self.format_chat_message(original_prompt)
+                if preview != full_content:
+                    st.markdown(preview)
+                    with st.expander("Show full message", expanded=False):
+                        st.markdown(full_content)
+                else:
+                    st.markdown(full_content)
+                
+                # If there are text files, show them in an expander
+                if "\nContent from" in prompt:
+                    with st.expander("📄 Uploaded Text Content", expanded=False):
+                        # Extract and display each text file content
+                        text_parts = prompt.split("\nContent from")[1:]
+                        for part in text_parts:
+                            filename = part.split(":\n")[0]
+                            content = part.split(":\n")[1]
+                            st.markdown(f"**{filename}**")
+                            st.text_area(
+                                "",  # No label needed since we show filename above
+                                value=content,
+                                height=150,
+                                disabled=True
+                            )
+                
                 # Display media files
                 if media_objects['media_refs']:
                     with st.expander("📎 View Media", expanded=True):
@@ -418,8 +472,18 @@ class ChatbotUI:
                 ):
                     if response.content:
                         full_response += response.content
-                        message_placeholder.markdown(full_response + "▌")
-                message_placeholder.markdown(full_response)
+                        # Format the streaming response
+                        preview, _ = self.format_chat_message(full_response)
+                        message_placeholder.markdown(preview + "▌")
+                
+                # After streaming completes, show the full response with expander if needed
+                preview, full_content = self.format_chat_message(full_response)
+                if preview != full_content:
+                    message_placeholder.markdown(preview)
+                    with st.expander("Show full response", expanded=False):
+                        st.markdown(full_content)
+                else:
+                    message_placeholder.markdown(full_content)
                 
                 # Log conversation state after response
                 self.manager._log_conversation_state(agent, "After model response")
