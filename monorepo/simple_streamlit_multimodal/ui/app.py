@@ -8,7 +8,7 @@ from pathlib import Path
 import os
 import tempfile
 import json
-import PyPDF2  # Add PyPDF2 import
+import PyPDF2
 from datetime import datetime
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from js_utils.web_utils import summarize_web_search
@@ -16,13 +16,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 from chatbot.logic import ChatbotManager
 from agno.media import Audio, Image, Video
 from agno.agent import Message
-import logging
 
 # Create a temp directory for video files
 TEMP_VIDEO_DIR = Path(tempfile.gettempdir()) / "agno_videos"
 TEMP_VIDEO_DIR.mkdir(exist_ok=True)
-
-logger = logging.getLogger(__name__)
 
 class ChatbotUI:
     def __init__(self):
@@ -32,19 +29,15 @@ class ChatbotUI:
     @staticmethod
     def extract_pdf_text(pdf_data):
         """Helper function to extract text from PDF data"""
-        try:
-            # Create a PDF reader object
-            pdf_reader = PyPDF2.PdfReader(pdf_data)
+        # Create a PDF reader object
+        pdf_reader = PyPDF2.PdfReader(pdf_data)
+        
+        # Extract text from all pages
+        text = []
+        for page in pdf_reader.pages:
+            text.append(page.extract_text())
             
-            # Extract text from all pages
-            text = []
-            for page in pdf_reader.pages:
-                text.append(page.extract_text())
-                
-            return '\n'.join(text)
-        except Exception as e:
-            logger.error(f"Error extracting text from PDF: {str(e)}")
-            return f"Error extracting text from PDF: {str(e)}"
+        return '\n'.join(text)
 
     @staticmethod
     def safe_decode_text(content, filename):
@@ -116,28 +109,19 @@ class ChatbotUI:
             st.session_state.media_refs = []
         if "use_web_search" not in st.session_state:
             st.session_state.use_web_search = False
-        if "num_pages" not in st.session_state:
-            st.session_state.num_pages = 3
-            
+        
     def _save_last_session(self, session_id: str):
         """Save the last used session ID to a file"""
-        try:
-            with open("last_session.txt", "w") as f:
-                f.write(session_id if session_id else "")
-        except Exception:
-            # Silently fail if we can't write the file
-            pass
+        with open("last_session.txt", "w") as f:
+            f.write(session_id if session_id else "")
             
     def _load_last_session(self) -> str:
         """Load the last used session ID from file"""
-        try:
-            if not os.path.exists("last_session.txt"):
-                return None
-            with open("last_session.txt", "r") as f:
-                session_id = f.read().strip()
-                return session_id if session_id else None
-        except Exception:
+        if not os.path.exists("last_session.txt"):
             return None
+        with open("last_session.txt", "r") as f:
+            session_id = f.read().strip()
+            return session_id if session_id else None
         
     @staticmethod
     def handle_file_upload():
@@ -186,11 +170,8 @@ class ChatbotUI:
         
         # Clean up old temp video files
         for path in st.session_state.temp_video_paths:
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except Exception:
-                pass
+            if os.path.exists(path):
+                os.remove(path)
         st.session_state.temp_video_paths = []
         
         # Store and process each file
@@ -523,16 +504,6 @@ class ChatbotUI:
                 
                 # Add media references to message metadata
                 metadata = {'media_refs': media_objects['media_refs']} if media_objects['media_refs'] else None
-                
-                # Log the message being sent to the model
-                logger.debug("Sending message to model:")
-                logger.debug(json.dumps({
-                    'prompt': prompt,
-                    'has_images': bool(media_objects['images']),
-                    'has_videos': bool(media_objects['videos']),
-                    'has_audio': bool(media_objects['audio']),
-                    'has_media_refs': bool(media_objects['media_refs'])
-                }, indent=2))
                 
                 # Stream the response with media objects
                 for response in agent.run(
