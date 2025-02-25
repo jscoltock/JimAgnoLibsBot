@@ -9,7 +9,7 @@ sys.path.append(str(Path(__file__).parent))
 from ui.app import ChatbotUI
 
 def main():
-    st.title("Agno Chatbot")
+    st.title("Agno Chatbot Current Version")
     
     # Initialize UI
     ui = ChatbotUI()
