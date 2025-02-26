@@ -212,69 +212,70 @@ class ChatbotUI:
         # Get available sessions
         existing_sessions = self.manager.list_sessions()
         
-        # Create session options
-        session_options = ["New Session"]
-        session_id_to_name = {}
+        # Create session options and maintain internal mapping
+        session_options = ["➕ New Session"]
+        session_id_map = {}  # Map display names to session IDs
         if existing_sessions:
             for session in existing_sessions:
-                name = session.session_data.get("session_name", "Unnamed") if session.session_data else "Unnamed"
-                option = f"{name} ({session.session_id})"
-                session_options.append(option)
-                session_id_to_name[session.session_id] = name
+                name = session.session_data.get("session_name", "Unnamed")
+                session_id_map[name] = session.session_id
+                session_options.append(name)
         
         # Load last session
         last_session_id = self._load_last_session()
         default_index = 0
         
         # Find the index of the last session if it exists
-        if last_session_id and last_session_id in session_id_to_name:
-            last_session_name = session_id_to_name[last_session_id]
-            last_session_option = f"{last_session_name} ({last_session_id})"
-            if last_session_option in session_options:
-                default_index = session_options.index(last_session_option)
+        if last_session_id:
+            for session in existing_sessions:
+                if session.session_id == last_session_id:
+                    name = session.session_data.get("session_name", "Unnamed")
+                    if name in session_options:
+                        default_index = session_options.index(name)
+                    break
         
-        # Create columns for session selector and delete button
-        col1, col2 = st.sidebar.columns([3, 1])
-        
-        # Show session selector in first column
-        with col1:
-            selected_option = st.selectbox(
-                "Choose a session",
+        # Create session management expander
+        with st.sidebar.expander("💬 Sessions", expanded=False):
+            # Show session selector as radio buttons
+            selected_option = st.radio(
+                "Select a session",
                 session_options,
                 index=default_index,
-                key="session_selector"
+                key="session_selector",
+                label_visibility="collapsed"
             )
-        
-        # Handle session selection
-        if selected_option == "New Session":
-            session_name = st.sidebar.text_input("Enter a name for the new session", "", key="new_session_name")
-            if session_name.strip():
-                if "last_session" not in st.session_state or st.session_state.last_session != "new":
-                    st.session_state.last_session = "new"
-                    self._save_last_session("")  # Clear last session when creating new
-                    st.rerun()
-                return None, session_name.strip()
-            st.sidebar.warning("Please enter a session name")
-            st.stop()
-        else:
-            session_id = selected_option.split("(")[-1].rstrip(")")
-            session_name = selected_option.split(" (")[0]
             
-            # Show delete button in second column when a session is selected
-            with col2:
-                st.write("")  # Add some spacing to align with selectbox
-                if st.button("🗑️", help="Delete this session", type="secondary", key="delete_button"):
-                    # Show confirmation dialog
-                    st.session_state.show_delete_confirm = True
-                    
-            # Handle delete confirmation
-            if st.session_state.get('show_delete_confirm', False):
-                with st.sidebar.expander("⚠️ Confirm Deletion", expanded=True):
+            # Handle session selection
+            if selected_option == "➕ New Session":
+                session_name = st.text_input("Enter a name for the new session", "", key="new_session_name")
+                if session_name.strip():
+                    if "last_session" not in st.session_state or st.session_state.last_session != "new":
+                        st.session_state.last_session = "new"
+                        self._save_last_session("")  # Clear last session when creating new
+                        st.rerun()
+                    return None, session_name.strip()
+                st.warning("Please enter a session name")
+                st.stop()
+            else:
+                # Get session ID from the mapping
+                session_id = session_id_map[selected_option]
+                session_name = selected_option
+                
+                # Create columns for each session's delete button
+                col1, col2 = st.columns([6, 1])
+                with col2:
+                    if st.button("🗑️", key=f"delete_{session_id}", help="Delete this session"):
+                        st.session_state.show_delete_confirm = True
+                        st.session_state.delete_session_id = session_id
+                        st.session_state.delete_session_name = session_name
+                
+                # Handle delete confirmation
+                if st.session_state.get('show_delete_confirm', False) and st.session_state.get('delete_session_id') == session_id:
                     st.warning(f"Are you sure you want to delete session '{session_name}'?")
                     st.write("This action cannot be undone.")
                     col3, col4 = st.columns([1, 1])
                     with col3:
-                        if st.button("Yes, Delete", type="primary", key="confirm_delete"):
+                        if st.button("Yes, Delete", type="primary", key=f"confirm_delete_{session_id}"):
                             try:
                                 # Delete the session
                                 self.manager.delete_session(session_id)
@@ -291,43 +292,43 @@ class ChatbotUI:
                             except Exception as e:
                                 st.error(f"Error deleting session: {str(e)}")
                     with col4:
-                        if st.button("Cancel", type="secondary", key="cancel_delete"):
+                        if st.button("Cancel", type="secondary", key=f"cancel_delete_{session_id}"):
                             st.session_state.show_delete_confirm = False
                             st.rerun()
-            
-            if "last_session" not in st.session_state or st.session_state.last_session != session_id:
-                st.session_state.last_session = session_id
-                self._save_last_session(session_id)  # Save the selected session
-                st.rerun()
-            
-            # Display current session info
-            st.sidebar.markdown("---")
-            st.sidebar.markdown(f"**Current Session:** {session_name}")
-            
-            # File uploader in expander
-            with st.sidebar.expander("📎 Upload Files", expanded=False):
-                # File uploader with callback - add PDF to accepted types
-                _ = st.file_uploader(
-                    "Choose files",
-                    type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt', 'pdf'],
-                    accept_multiple_files=True,
-                    key="file_uploader",
-                    on_change=ChatbotUI.handle_file_upload
-                )
-            
-            # Web search controls in expander
-            with st.sidebar.expander("🔍 Web Search", expanded=False):
-                use_web_search = st.checkbox("Use Web Search", value=False, key="use_web_search")
-                num_pages = st.number_input(
-                    "Number of Pages to Search",
-                    min_value=1,
-                    max_value=10,
-                    value=3,
-                    key="num_pages",
-                    help="Number of web pages to search and summarize"
-                )
-            
-            return session_id, session_name
+                
+                if "last_session" not in st.session_state or st.session_state.last_session != session_id:
+                    st.session_state.last_session = session_id
+                    self._save_last_session(session_id)  # Save the selected session
+                    st.rerun()
+        
+        # Display current session info outside the expander
+        st.sidebar.markdown("---")
+        st.sidebar.markdown(f"**Current Session:** {session_name}")
+        
+        # File uploader in expander
+        with st.sidebar.expander("📎 Upload Files", expanded=False):
+            # File uploader with callback - add PDF to accepted types
+            _ = st.file_uploader(
+                "Choose files",
+                type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt', 'pdf'],
+                accept_multiple_files=True,
+                key="file_uploader",
+                on_change=ChatbotUI.handle_file_upload
+            )
+        
+        # Web search controls in expander
+        with st.sidebar.expander("🔍 Web Search", expanded=False):
+            use_web_search = st.checkbox("Use Web Search", value=False, key="use_web_search")
+            num_pages = st.number_input(
+                "Number of Pages to Search",
+                min_value=1,
+                max_value=10,
+                value=3,
+                key="num_pages",
+                help="Number of web pages to search and summarize"
+            )
+        
+        return session_id, session_name
     
     def render_chat(self, agent):
         """Render chat interface for the given agent"""
