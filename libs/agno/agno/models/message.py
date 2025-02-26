@@ -166,6 +166,8 @@ class Message(BaseModel):
     references: Optional[MessageReferences] = None
     # The Unix timestamp the message was created.
     created_at: int = Field(default_factory=lambda: int(time()))
+    # Additional metadata for the message (e.g., media references)
+    metadata: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(extra="allow", populate_by_name=True, arbitrary_types_allowed=True)
 
@@ -218,6 +220,7 @@ class Message(BaseModel):
             "tool_args": self.tool_args,
             "tool_call_error": self.tool_call_error,
             "tool_calls": self.tool_calls,
+            "metadata": self.metadata,
         }
         # Filter out None and empty collections
         message_dict = {

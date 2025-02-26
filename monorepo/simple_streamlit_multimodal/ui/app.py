@@ -95,7 +95,12 @@ class ChatbotUI:
     @staticmethod
     def has_non_text_media(media_refs: list) -> bool:
         """Check if there are any non-text media files in the references"""
-        return any(ref['type'] != 'text' for ref in media_refs)
+        if not media_refs:
+            return False
+        return any(
+            ref.get('type') in ['image', 'video', 'audio']
+            for ref in media_refs
+        )
         
     def initialize_session_state(self):
         """Initialize session state variables"""
@@ -109,6 +114,10 @@ class ChatbotUI:
             st.session_state.media_refs = []
         if "use_web_search" not in st.session_state:
             st.session_state.use_web_search = False
+        if "message_metadata" not in st.session_state:
+            st.session_state.message_metadata = {}
+        if "current_media_refs" not in st.session_state:
+            st.session_state.current_media_refs = None
         
     def _save_last_session(self, session_id: str):
         """Save the last used session ID to a file"""
@@ -329,6 +338,9 @@ class ChatbotUI:
         # Display messages from agent memory
         if agent.memory and agent.memory.messages:
             for idx, msg in enumerate(agent.memory.messages):
+                # Generate a unique message ID
+                message_id = f"{msg.role}_{idx}"
+                
                 # Create columns for message and delete button
                 msg_col, del_col = st.columns([20, 1])
                 
@@ -342,13 +354,24 @@ class ChatbotUI:
                                 st.markdown(full_content)
                         else:
                             st.markdown(full_content)
+                        
+                        # Get metadata from session state or message object
+                        metadata = st.session_state.message_metadata.get(message_id, {})
+                        if not metadata and hasattr(msg, 'metadata') and msg.metadata:
+                            metadata = msg.metadata
+                            # Store in session state for persistence
+                            st.session_state.message_metadata[message_id] = metadata
                             
-                        # Display media if present in message metadata
-                        if hasattr(msg, 'metadata') and msg.metadata and 'media_refs' in msg.metadata:
+                        # Display media if present in metadata
+                        if metadata:
+                            # Log metadata for debugging
+                            print(f"Message {idx} metadata from session state: {metadata}")
+                            
+                            media_refs = metadata.get('media_refs', [])
                             # Only show media expander if there are non-text media files
-                            if self.has_non_text_media(msg.metadata['media_refs']):
+                            if self.has_non_text_media(media_refs):
                                 with st.expander("📎 View Media", expanded=False):
-                                    for media_ref in msg.metadata['media_refs']:
+                                    for media_ref in media_refs:
                                         if media_ref['type'] != 'text':  # Skip text files
                                             stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
                                             st.write(f"**{media_ref['original_name']}**")
@@ -362,8 +385,10 @@ class ChatbotUI:
                 # Show delete button for the message
                 with del_col:
                     if st.button("🗑️", key=f"delete_msg_{idx}", help="Delete this message"):
-                        # Remove message from memory
+                        # Remove message from memory and session state
                         agent.memory.messages.pop(idx)
+                        if message_id in st.session_state.message_metadata:
+                            del st.session_state.message_metadata[message_id]
                         # Update session in storage
                         agent.write_to_storage()
                         st.rerun()
@@ -503,7 +528,16 @@ class ChatbotUI:
                 full_response = ""
                 
                 # Add media references to message metadata
-                metadata = {'media_refs': media_objects['media_refs']} if media_objects['media_refs'] else None
+                metadata = None
+                if media_objects['media_refs']:
+                    metadata = {
+                        'media_refs': media_objects['media_refs'],
+                        'has_media': True  # Always set to True if we have media refs
+                    }
+                    # Store current media refs in session state
+                    st.session_state.current_media_refs = media_objects['media_refs']
+                    # Log metadata for debugging
+                    print(f"Creating new message with metadata: {metadata}")
                 
                 # Stream the response with media objects
                 for response in agent.run(
@@ -519,6 +553,11 @@ class ChatbotUI:
                         # Format the streaming response
                         preview, _ = self.format_chat_message(full_response)
                         message_placeholder.markdown(preview + "▌")
+                
+                # After streaming completes, store metadata for the new message
+                if metadata:
+                    message_id = f"assistant_{len(agent.memory.messages)}"
+                    st.session_state.message_metadata[message_id] = metadata
                 
                 # After streaming completes, show the full response with expander if needed
                 preview, full_content = self.format_chat_message(full_response)
