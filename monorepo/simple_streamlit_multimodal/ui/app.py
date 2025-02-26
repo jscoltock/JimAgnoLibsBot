@@ -209,34 +209,6 @@ class ChatbotUI:
     
     def render_session_selector(self) -> tuple[str, str]:
         """Render session selection UI and return selected session info"""
-        st.sidebar.title("Session Management")
-        
-        # File uploader
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("Upload Files")
-        
-        # File uploader with callback - add PDF to accepted types
-        _ = st.sidebar.file_uploader(
-            "Choose files",
-            type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt', 'pdf'],
-            accept_multiple_files=True,
-            key="file_uploader",
-            on_change=ChatbotUI.handle_file_upload
-        )
-        
-        # Add web search controls
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("Web Search")
-        use_web_search = st.sidebar.checkbox("Use Web Search", value=False, key="use_web_search")
-        num_pages = st.sidebar.number_input(
-            "Number of Pages to Search",
-            min_value=1,
-            max_value=10,
-            value=3,
-            key="num_pages",
-            help="Number of web pages to search and summarize"
-        )
-        
         # Get available sessions
         existing_sessions = self.manager.list_sessions()
         
@@ -327,6 +299,33 @@ class ChatbotUI:
                 st.session_state.last_session = session_id
                 self._save_last_session(session_id)  # Save the selected session
                 st.rerun()
+            
+            # Display current session info
+            st.sidebar.markdown("---")
+            st.sidebar.markdown(f"**Current Session:** {session_name}")
+            
+            # File uploader in expander
+            with st.sidebar.expander("📎 Upload Files", expanded=False):
+                # File uploader with callback - add PDF to accepted types
+                _ = st.file_uploader(
+                    "Choose files",
+                    type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt', 'pdf'],
+                    accept_multiple_files=True,
+                    key="file_uploader",
+                    on_change=ChatbotUI.handle_file_upload
+                )
+            
+            # Web search controls in expander
+            with st.sidebar.expander("🔍 Web Search", expanded=False):
+                use_web_search = st.checkbox("Use Web Search", value=False, key="use_web_search")
+                num_pages = st.number_input(
+                    "Number of Pages to Search",
+                    min_value=1,
+                    max_value=10,
+                    value=3,
+                    key="num_pages",
+                    help="Number of web pages to search and summarize"
+                )
             
             return session_id, session_name
     
