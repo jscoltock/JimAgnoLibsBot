@@ -11,6 +11,7 @@ import logging
 import sqlite3
 import json
 from .media_manager import MediaManager
+import streamlit as st
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -102,8 +103,11 @@ class ChatbotManager:
             update_session_summary_after_run=False,
         )
         
+        # Get the selected model from session state
+        model_id = st.session_state.get('selected_model', "gemini-2.0-flash-thinking-exp-1219")
+        
         agent = Agent(
-            model=Gemini(id="gemini-2.0-flash-exp"),
+            model=Gemini(id=model_id),
             storage=self.storage,
             memory=memory,
             session_id=session_id,

@@ -18,6 +18,15 @@ from agno.media import Audio, Image, Video
 from agno.agent import Message
 import logging
 
+# Available Gemini models
+AVAILABLE_MODELS = {
+    "Gemini 2.0 Flash": "gemini-2.0-flash-exp",
+    "Gemini 2.0 Flash Thinking": "gemini-2.0-flash-thinking-exp-1219",
+    "Gemini 1.5 Flash": "gemini-1.5-flash",
+    "Gemini 1.5 Flash 8B": "gemini-1.5-flash-8b"
+}
+DEFAULT_MODEL = "gemini-2.0-flash-exp"
+
 # Create a temp directory for video files
 TEMP_VIDEO_DIR = Path(tempfile.gettempdir()) / "agno_videos"
 TEMP_VIDEO_DIR.mkdir(exist_ok=True)
@@ -121,6 +130,8 @@ class ChatbotUI:
             st.session_state.message_metadata = {}
         if "current_media_refs" not in st.session_state:
             st.session_state.current_media_refs = None
+        if "selected_model" not in st.session_state:
+            st.session_state.selected_model = DEFAULT_MODEL
         
     def _save_last_session(self, session_id: str):
         """Save the last used session ID to a file"""
@@ -246,6 +257,19 @@ class ChatbotUI:
                 name = session.session_data.get("session_name", "Unnamed")
                 session_id_map[name] = session.session_id
                 session_options.append(name)
+                
+        # Display current session info
+        st.sidebar.markdown("---")
+        st.sidebar.markdown(f"**Current Session:** {session_options[0] if not session_id_map else session_options[-1]}")
+        
+        # Add model selector
+        st.sidebar.markdown("---")
+        selected_model_name = st.sidebar.selectbox(
+            "Select Model",
+            options=list(AVAILABLE_MODELS.keys()),
+            index=list(AVAILABLE_MODELS.values()).index(st.session_state.selected_model)
+        )
+        st.session_state.selected_model = AVAILABLE_MODELS[selected_model_name]
         
         # Load last session
         last_session_id = self._load_last_session()
