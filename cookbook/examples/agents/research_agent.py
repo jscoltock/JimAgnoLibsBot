@@ -123,7 +123,7 @@ research_agent = Agent(
 # Example usage with detailed research request
 if __name__ == "__main__":
     research_agent.print_response(
-        "Analyze the impact of remote work on urban development",
+        "Research the evolution of digital privacy and data protection measures",
         stream=True,
     )
 
