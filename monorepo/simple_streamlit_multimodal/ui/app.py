@@ -126,6 +126,10 @@ class ChatbotUI:
             st.session_state.media_refs = []
         if "use_web_search" not in st.session_state:
             st.session_state.use_web_search = False
+        if "use_youtube_summary" not in st.session_state:
+            st.session_state.use_youtube_summary = False
+        if "use_research_assistant" not in st.session_state:
+            st.session_state.use_research_assistant = False
         if "message_metadata" not in st.session_state:
             st.session_state.message_metadata = {}
         if "current_media_refs" not in st.session_state:
@@ -366,17 +370,30 @@ class ChatbotUI:
                 on_change=ChatbotUI.handle_file_upload
             )
         
-        # Web search controls in expander
-        with st.sidebar.expander("🔍 Web Search", expanded=False):
-            use_web_search = st.checkbox("Use Web Search", value=False, key="use_web_search")
-            num_pages = st.number_input(
-                "Number of Pages to Search",
-                min_value=1,
-                max_value=10,
-                value=3,
-                key="num_pages",
-                help="Number of web pages to search and summarize"
+        # Tools controls in expander
+        with st.sidebar.expander("🛠️ Tools", expanded=False):
+            selected_tool = st.radio(
+                "Select Tool",
+                options=["None", "Web Search", "Youtube Summary", "Research Assistant"],
+                key="selected_tool",
+                index=0  # Default to "None"
             )
+            
+            # Update session state based on selection
+            st.session_state.use_web_search = (selected_tool == "Web Search")
+            st.session_state.use_youtube_summary = (selected_tool == "Youtube Summary")
+            st.session_state.use_research_assistant = (selected_tool == "Research Assistant")
+            
+            # Show number of pages input only when Web Search is selected
+            if selected_tool == "Web Search":
+                num_pages = st.number_input(
+                    "Number of Pages to Search",
+                    min_value=1,
+                    max_value=10,
+                    value=3,
+                    key="num_pages",
+                    help="Number of web pages to search and summarize"
+                )
         
         return session_id, session_name
     
