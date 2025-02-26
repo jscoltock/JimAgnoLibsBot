@@ -21,6 +21,7 @@ class ChatbotManager:
         self.storage = self._init_storage()
         self.media_manager = MediaManager()
         self.db_path = Path(__file__).parent.parent / "chat_storage.db"
+        self._init_media_metadata_table()
         
     def _init_storage(self):
         """Initialize and return agent storage for session management"""
@@ -29,6 +30,52 @@ class ChatbotManager:
             db_file=str(Path(__file__).parent.parent / "chat_storage.db")
         )
     
+    def _init_media_metadata_table(self):
+        """Initialize the media metadata table"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS media_metadata (
+                        session_id TEXT,
+                        message_id TEXT,
+                        metadata TEXT,
+                        PRIMARY KEY (session_id, message_id)
+                    )
+                """)
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error creating media metadata table: {str(e)}")
+            
+    def _save_media_metadata(self, session_id: str, message_id: str, metadata: dict):
+        """Save media metadata to the database"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO media_metadata (session_id, message_id, metadata) VALUES (?, ?, ?)",
+                    (session_id, message_id, json.dumps(metadata))
+                )
+                conn.commit()
+                logger.debug(f"Saved metadata for session {session_id}, message {message_id}")
+        except Exception as e:
+            logger.error(f"Error saving media metadata: {str(e)}")
+            
+    def _load_media_metadata(self, session_id: str) -> dict:
+        """Load media metadata for a session"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT message_id, metadata FROM media_metadata WHERE session_id = ?",
+                    (session_id,)
+                )
+                metadata_dict = {}
+                for message_id, metadata_json in cursor:
+                    metadata_dict[message_id] = json.loads(metadata_json)
+                logger.debug(f"Loaded metadata for session {session_id}: {metadata_dict}")
+                return metadata_dict
+        except Exception as e:
+            logger.error(f"Error loading media metadata: {str(e)}")
+            return {}
+            
     def _log_conversation_state(self, agent: Agent, stage: str):
         """Log the current state of the conversation"""
         if not agent.memory or not agent.memory.messages:
@@ -68,14 +115,39 @@ class ChatbotManager:
             debug_mode=True
         )
         
-        # Load existing session data if session_id is provided
+        # Load existing session if session_id provided
         if session_id:
+            # Load the session first
             agent.load_session()
             logger.debug(f"Loaded session {session_id}")
+            
+            # Load media metadata from our table
+            stored_metadata = self._load_media_metadata(session_id)
+            logger.debug(f"Loaded media metadata from database: {stored_metadata}")
+            
+            # Restore metadata for each message
+            if agent.memory and agent.memory.messages:
+                for msg in agent.memory.messages:
+                    # Skip system messages
+                    if msg.role == 'system':
+                        continue
+                        
+                    # Get stored metadata for this message
+                    msg_id = f"{msg.role}_{agent.memory.messages.index(msg)}"
+                    if msg_id in stored_metadata:
+                        msg.metadata = stored_metadata[msg_id].copy()
+                        logger.debug(f"Restored metadata for message {msg_id}: {msg.metadata}")
+            
             self._log_conversation_state(agent, "After session load")
             
         return agent
     
+    def save_message_metadata(self, agent: Agent, message_id: str, metadata: dict):
+        """Save metadata for a specific message"""
+        if agent.session_id:
+            self._save_media_metadata(agent.session_id, message_id, metadata)
+            logger.debug(f"Saved metadata for message {message_id} in session {agent.session_id}")
+            
     def list_sessions(self) -> list:
         """Get all available sessions"""
         return self.storage.get_all_sessions()
@@ -89,6 +161,12 @@ class ChatbotManager:
             logger.debug("Attempting to delete media files...")
             self.media_manager.cleanup_session(session_id)
             logger.debug("Media files deleted successfully")
+            
+            # Delete media metadata
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("DELETE FROM media_metadata WHERE session_id = ?", (session_id,))
+                conn.commit()
+            logger.debug("Media metadata deleted successfully")
             
             # Delete session using Agno storage
             logger.debug("Attempting to delete session from database...")

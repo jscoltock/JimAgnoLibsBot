@@ -362,6 +362,16 @@ class ChatbotUI:
                             # Store in session state for persistence
                             st.session_state.message_metadata[message_id] = metadata
                             
+                            # Also store in agent session data
+                            if not hasattr(agent, 'session_data') or agent.session_data is None:
+                                agent.session_data = {}
+                            if 'message_metadata' not in agent.session_data:
+                                agent.session_data['message_metadata'] = {}
+                            agent.session_data['message_metadata'][message_id] = metadata.copy()  # Make a copy to prevent reference issues
+                            # Ensure storage is updated
+                            agent.write_to_storage()
+                            print(f"Saved metadata to storage for message {message_id}: {metadata}")
+                            
                         # Display media if present in metadata
                         if metadata:
                             # Log metadata for debugging
@@ -506,7 +516,7 @@ class ChatbotUI:
                                 disabled=True
                             )
                 
-                # Display media files
+                # Display media files and save metadata
                 if media_objects['media_refs']:
                     # Only show media expander if there are non-text media files
                     if self.has_non_text_media(media_objects['media_refs']):
@@ -521,6 +531,15 @@ class ChatbotUI:
                                         st.video(str(stored_path))
                                     elif media_ref['type'] == 'audio':
                                         st.audio(str(stored_path))
+                    
+                    # Save metadata for user message
+                    message_id = f"user_{len(agent.memory.messages)}"
+                    metadata = {
+                        'media_refs': media_objects['media_refs'],
+                        'has_media': True
+                    }
+                    self.manager.save_message_metadata(agent, message_id, metadata)
+                    msg.metadata = metadata.copy()
             
             # Get and display bot response with streaming
             with st.chat_message("assistant"):
@@ -557,7 +576,8 @@ class ChatbotUI:
                 # After streaming completes, store metadata for the new message
                 if metadata:
                     message_id = f"assistant_{len(agent.memory.messages)}"
-                    st.session_state.message_metadata[message_id] = metadata
+                    self.manager.save_message_metadata(agent, message_id, metadata)
+                    msg.metadata = metadata.copy()
                 
                 # After streaming completes, show the full response with expander if needed
                 preview, full_content = self.format_chat_message(full_response)
