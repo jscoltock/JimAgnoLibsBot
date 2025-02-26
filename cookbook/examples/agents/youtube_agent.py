@@ -44,6 +44,7 @@ youtube_agent = Agent(
 
         Your analysis style:
         - Begin with a video overview
+        - Then give a summary of the video
         - Use clear, descriptive segment titles
         - Include relevant emojis for content types:
           📚 Educational
