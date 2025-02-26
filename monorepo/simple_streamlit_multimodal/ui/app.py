@@ -16,10 +16,13 @@ sys.path.append(str(Path(__file__).parent.parent))
 from chatbot.logic import ChatbotManager
 from agno.media import Audio, Image, Video
 from agno.agent import Message
+import logging
 
 # Create a temp directory for video files
 TEMP_VIDEO_DIR = Path(tempfile.gettempdir()) / "agno_videos"
 TEMP_VIDEO_DIR.mkdir(exist_ok=True)
+
+logger = logging.getLogger(__name__)
 
 class ChatbotUI:
     def __init__(self):
@@ -185,23 +188,46 @@ class ChatbotUI:
         
         # Store and process each file
         for file in st.session_state.uploaded_files:
-            # Store media file and get reference
-            media_ref = self.manager.media_manager.store_media(
-                st.session_state.current_session_id or 'temp', 
-                file
-            )
-            media_objects['media_refs'].append(media_ref)
-            
-            # Get the full path for the stored file
-            stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
-            
-            # Create appropriate media object
-            if file['type'] == 'image':
-                media_objects['images'].append(Image(filepath=str(stored_path)))
-            elif file['type'] == 'video':
-                media_objects['videos'].append(Video(filepath=str(stored_path)))
-            elif file['type'] == 'audio':
-                media_objects['audio'].append(Audio(filepath=str(stored_path)))
+            try:
+                # Store media file and get reference
+                media_ref = self.manager.media_manager.store_media(
+                    st.session_state.current_session_id or 'temp', 
+                    file
+                )
+                media_objects['media_refs'].append(media_ref)
+                
+                # Get the full path for the stored file
+                stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                
+                # Create appropriate media object with error handling
+                try:
+                    if file['type'] == 'image':
+                        media_objects['images'].append(Image(filepath=str(stored_path)))
+                    elif file['type'] == 'video':
+                        # Check video file size
+                        file_size = os.path.getsize(stored_path)
+                        max_size = 20 * 1024 * 1024  # 20MB limit for Gemini
+                        
+                        if file_size > max_size:
+                            logger.warning(f"Video file too large ({file_size} bytes) for Gemini API. Max size is {max_size} bytes.")
+                            st.warning(f"Video '{file['name']}' is too large for AI processing. The video will be displayed but not processed by the AI.")
+                        else:
+                            try:
+                                video_obj = Video(filepath=str(stored_path))
+                                media_objects['videos'].append(video_obj)
+                            except Exception as e:
+                                logger.error(f"Error creating video object: {str(e)}")
+                                st.error(f"Error processing video '{file['name']}'. The video will be displayed but not processed by the AI.")
+                    elif file['type'] == 'audio':
+                        media_objects['audio'].append(Audio(filepath=str(stored_path)))
+                except Exception as e:
+                    logger.error(f"Error creating media object for {file['name']}: {str(e)}")
+                    st.error(f"Error processing {file['type']} file '{file['name']}'. The file will be stored but may not be fully functional.")
+                    
+            except Exception as e:
+                logger.error(f"Error storing media file {file['name']}: {str(e)}")
+                st.error(f"Error uploading file '{file['name']}'. Please try again or use a different file.")
+                continue
                 
         # Save media references to session state
         st.session_state.media_refs = media_objects['media_refs']
@@ -383,14 +409,22 @@ class ChatbotUI:
                                 with st.expander("📎 View Media", expanded=False):
                                     for media_ref in media_refs:
                                         if media_ref['type'] != 'text':  # Skip text files
-                                            stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
-                                            st.write(f"**{media_ref['original_name']}**")
-                                            if media_ref['type'] == 'image':
-                                                st.image(str(stored_path))
-                                            elif media_ref['type'] == 'video':
-                                                st.video(str(stored_path))
-                                            elif media_ref['type'] == 'audio':
-                                                st.audio(str(stored_path))
+                                            try:
+                                                stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                                                if stored_path.exists():
+                                                    st.write(f"**{media_ref['original_name']}**")
+                                                    if media_ref['type'] == 'image':
+                                                        st.image(str(stored_path))
+                                                    elif media_ref['type'] == 'video':
+                                                        st.video(str(stored_path))
+                                                    elif media_ref['type'] == 'audio':
+                                                        st.audio(str(stored_path))
+                                                else:
+                                                    st.warning(f"Media file not found: {media_ref['original_name']}")
+                                                    logger.warning(f"Media file not found at path: {stored_path}")
+                                            except Exception as e:
+                                                logger.error(f"Error displaying media {media_ref['original_name']}: {str(e)}")
+                                                st.error(f"Unable to display media: {media_ref['original_name']}")
                 
                 # Show delete button for the message
                 with del_col:
@@ -523,14 +557,22 @@ class ChatbotUI:
                         with st.expander("📎 View Media", expanded=True):
                             for media_ref in media_objects['media_refs']:
                                 if media_ref['type'] != 'text':  # Skip text files
-                                    stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
-                                    st.write(f"**{media_ref['original_name']}**")
-                                    if media_ref['type'] == 'image':
-                                        st.image(str(stored_path))
-                                    elif media_ref['type'] == 'video':
-                                        st.video(str(stored_path))
-                                    elif media_ref['type'] == 'audio':
-                                        st.audio(str(stored_path))
+                                    try:
+                                        stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
+                                        if stored_path.exists():
+                                            st.write(f"**{media_ref['original_name']}**")
+                                            if media_ref['type'] == 'image':
+                                                st.image(str(stored_path))
+                                            elif media_ref['type'] == 'video':
+                                                st.video(str(stored_path))
+                                            elif media_ref['type'] == 'audio':
+                                                st.audio(str(stored_path))
+                                        else:
+                                            st.warning(f"Media file not found: {media_ref['original_name']}")
+                                            logger.warning(f"Media file not found at path: {stored_path}")
+                                    except Exception as e:
+                                        logger.error(f"Error displaying media {media_ref['original_name']}: {str(e)}")
+                                        st.error(f"Unable to display media: {media_ref['original_name']}")
                     
                     # Save metadata for user message
                     message_id = f"user_{len(agent.memory.messages)}"

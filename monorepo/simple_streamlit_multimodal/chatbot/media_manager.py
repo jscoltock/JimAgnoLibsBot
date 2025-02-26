@@ -7,6 +7,7 @@ import shutil
 import hashlib
 import logging
 from typing import Dict, Any
+from uuid import uuid4
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -18,17 +19,28 @@ class MediaManager:
         self.media_dir.mkdir(exist_ok=True)
         logger.debug(f"Initialized MediaManager with media_dir: {self.media_dir}")
         
+    def _generate_short_filename(self, file_hash: str, session_id: str, unique_id: str, file_ext: str) -> str:
+        """Generate a short filename that complies with API limits while maintaining uniqueness"""
+        # Use first 8 chars of hash, first 8 of session_id, and first 4 of unique_id
+        short_name = f"{file_hash[:8]}_{session_id[:8]}_{unique_id[:4]}{file_ext}"
+        logger.debug(f"Generated short filename: {short_name} (length: {len(short_name)})")
+        return short_name
+        
     def store_media(self, session_id: str, file_data: dict) -> dict:
-        """Store media file and return reference data"""
+        """Store media file with session-specific unique identifier using shortened names"""
         session_dir = self.media_dir / session_id
         session_dir.mkdir(exist_ok=True)
         logger.debug(f"Storing media in session directory: {session_dir}")
         
-        # Create a unique hash for the file
+        # Create unique identifier for this file in this session
         file_hash = hashlib.md5(file_data['data']).hexdigest()
+        unique_id = str(uuid4())
         file_ext = Path(file_data['name']).suffix
-        stored_path = session_dir / f"{file_hash}{file_ext}"
-        logger.debug(f"Generated stored path: {stored_path}")
+        
+        # Generate shortened filename
+        filename = self._generate_short_filename(file_hash, session_id, unique_id, file_ext)
+        stored_path = session_dir / filename
+        logger.debug(f"Generated stored path with shortened unique ID: {stored_path}")
         
         # Store the file
         with open(stored_path, 'wb') as f:
@@ -39,7 +51,9 @@ class MediaManager:
             'type': file_data['type'],
             'original_name': file_data['name'],
             'stored_path': str(stored_path.relative_to(self.media_dir)),
-            'file_hash': file_hash
+            'file_hash': file_hash,
+            'unique_id': unique_id[:4],  # Store shortened unique_id
+            'short_name': filename  # Store the short name for reference
         }
     
     def get_media_path(self, stored_path: str) -> Path:
@@ -82,5 +96,7 @@ class MediaManager:
             'type': media_ref['type'],
             'original_name': media_ref['original_name'],
             'stored_path': media_ref['stored_path'],
-            'file_hash': media_ref['file_hash']
+            'file_hash': media_ref['file_hash'],
+            'unique_id': media_ref.get('unique_id'),
+            'short_name': media_ref.get('short_name')  # Include short_name in serialization
         } 
