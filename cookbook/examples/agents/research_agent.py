@@ -25,13 +25,16 @@ Dependencies: `pip install openai duckduckgo-search newspaper4k lxml_html_clean 
 from textwrap import dedent
 
 from agno.agent import Agent
-from agno.models.openai import OpenAIChat
+#from agno.models.openai import OpenAIChat
+from agno.models.google import Gemini
 from agno.tools.duckduckgo import DuckDuckGoTools
+#from agno.tools.searxng import Searxng
 from agno.tools.newspaper4k import Newspaper4kTools
 
 # Initialize the research agent with advanced journalistic capabilities
 research_agent = Agent(
-    model=OpenAIChat(id="gpt-4o"),
+    #model=OpenAIChat(id="gpt-4o"),
+    model=Gemini(id="gemini-2.0-flash-exp"),
     tools=[DuckDuckGoTools(), Newspaper4kTools()],
     description=dedent("""\
         You are an elite investigative journalist with decades of experience at the New York Times.
@@ -120,7 +123,7 @@ research_agent = Agent(
 # Example usage with detailed research request
 if __name__ == "__main__":
     research_agent.print_response(
-        "Analyze the current state and future implications of artificial intelligence regulation worldwide",
+        "Analyze the impact of remote work on urban development",
         stream=True,
     )
 
