@@ -15,14 +15,14 @@ Run: `pip install openai youtube_transcript_api agno` to install the dependencie
 """
 
 from textwrap import dedent
-
+from agno.models.google import Gemini
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from agno.tools.youtube import YouTubeTools
 
 youtube_agent = Agent(
     name="YouTube Agent",
-    model=OpenAIChat(id="gpt-4o"),
+    model=Gemini(id="gemini-2.0-flash"),
     tools=[YouTubeTools()],
     show_tool_calls=True,
     instructions=dedent("""\
@@ -68,7 +68,7 @@ youtube_agent = Agent(
 
 # Example usage with different types of videos
 youtube_agent.print_response(
-    "Analyze this video: https://www.youtube.com/watch?v=zjkBMFhNj_g",
+    "Analyze this video: https://www.youtube.com/watch?v=eXdVDhOGqoE",
     stream=True,
 )
 
