@@ -188,6 +188,37 @@ class ChatbotUI:
             session_id = f.read().strip()
             return session_id if session_id else None
         
+    def clear_session_cache(self):
+        """Clear session-related cache to force UI refresh"""
+        # Clear session selector from session state
+        if "session_selector" in st.session_state:
+            del st.session_state.session_selector
+        
+        # Clear any other session-related cache
+        st.session_state.current_session_id = None
+        st.session_state.agent = None
+        st.session_state.last_session = None
+        
+        # Set flag to trigger rerun
+        st.session_state.session_switch_rerun = True
+        
+    @staticmethod
+    def clear_uploaded_files():
+        """Clear all uploaded files from session state"""
+        # This clears the files from the session state, but they remain in the chat history
+        # if they were already used in a conversation
+        st.session_state.uploaded_files = []
+        st.session_state.file_upload_rerun = True
+        
+    @staticmethod
+    def delete_uploaded_file(index):
+        """Delete a specific uploaded file from session state"""
+        # This removes a specific file from the session state, but it remains in the chat history
+        # if it was already used in a conversation
+        if 0 <= index < len(st.session_state.uploaded_files):
+            st.session_state.uploaded_files.pop(index)
+            st.session_state.file_upload_rerun = True
+        
     @staticmethod
     def handle_file_upload():
         """Handle file upload and store in session state"""
@@ -244,9 +275,22 @@ class ChatbotUI:
                 os.remove(path)
         st.session_state.temp_video_paths = []
         
+        # Track total media size
+        total_media_size = 0
+        max_size = 15 * 1024 * 1024  # 15MB limit (leaving 5MB for text and metadata)
+        
         # Store and process each file
         for file in st.session_state.uploaded_files:
             try:
+                # Get file size
+                file_size = len(file['data'])
+                
+                # Check if adding this file would exceed our size limit
+                if total_media_size + file_size > max_size:
+                    logger.warning(f"Skipping file {file['name']} as it would exceed the 15MB media size limit")
+                    st.warning(f"File '{file['name']}' was not processed by the AI due to size constraints. The total media size must be under 15MB.")
+                    continue
+                
                 # Store media file and get reference
                 media_ref = self.manager.media_manager.store_media(
                     st.session_state.current_session_id or 'temp', 
@@ -260,24 +304,40 @@ class ChatbotUI:
                 # Create appropriate media object with error handling
                 try:
                     if file['type'] == 'image':
-                        media_objects['images'].append(Image(filepath=str(stored_path)))
+                        # Check image file size
+                        file_size = os.path.getsize(stored_path)
+                        if file_size > max_size:
+                            logger.warning(f"Image file too large ({file_size} bytes). Max size is {max_size} bytes.")
+                            st.warning(f"Image '{file['name']}' is too large for AI processing. The image will be displayed but not processed by the AI.")
+                        else:
+                            media_objects['images'].append(Image(filepath=str(stored_path)))
+                            total_media_size += file_size
+                            
                     elif file['type'] == 'video':
                         # Check video file size
                         file_size = os.path.getsize(stored_path)
-                        max_size = 20 * 1024 * 1024  # 20MB limit for Gemini
-                        
                         if file_size > max_size:
-                            logger.warning(f"Video file too large ({file_size} bytes) for Gemini API. Max size is {max_size} bytes.")
+                            logger.warning(f"Video file too large ({file_size} bytes). Max size is {max_size} bytes.")
                             st.warning(f"Video '{file['name']}' is too large for AI processing. The video will be displayed but not processed by the AI.")
                         else:
                             try:
                                 video_obj = Video(filepath=str(stored_path))
                                 media_objects['videos'].append(video_obj)
+                                total_media_size += file_size
                             except Exception as e:
                                 logger.error(f"Error creating video object: {str(e)}")
                                 st.error(f"Error processing video '{file['name']}'. The video will be displayed but not processed by the AI.")
+                                
                     elif file['type'] == 'audio':
-                        media_objects['audio'].append(Audio(filepath=str(stored_path)))
+                        # Check audio file size
+                        file_size = os.path.getsize(stored_path)
+                        if file_size > max_size:
+                            logger.warning(f"Audio file too large ({file_size} bytes). Max size is {max_size} bytes.")
+                            st.warning(f"Audio '{file['name']}' is too large for AI processing. The audio will be displayed but not processed by the AI.")
+                        else:
+                            media_objects['audio'].append(Audio(filepath=str(stored_path)))
+                            total_media_size += file_size
+                            
                 except Exception as e:
                     logger.error(f"Error creating media object for {file['name']}: {str(e)}")
                     st.error(f"Error processing {file['type']} file '{file['name']}'. The file will be stored but may not be fully functional.")
@@ -289,6 +349,10 @@ class ChatbotUI:
                 
         # Save media references to session state
         st.session_state.media_refs = media_objects['media_refs']
+        
+        # Log total media size
+        logger.info(f"Total media size: {total_media_size / 1024 / 1024:.2f} MB")
+        
         return media_objects
     
     def render_session_selector(self) -> tuple[str, str]:
@@ -378,14 +442,14 @@ class ChatbotUI:
                                 # Delete the session
                                 self.manager.delete_session(session_id)
                                 st.success("Session deleted successfully!")
-                                # Clear session state
-                                st.session_state.current_session_id = None
-                                st.session_state.agent = None
-                                st.session_state.last_session = None
+                                
                                 # Clear the last session file
                                 self._save_last_session("")
                                 st.session_state.show_delete_confirm = False
-                                st.session_state.session_switch_rerun = True
+                                
+                                # Clear session cache and force refresh
+                                self.clear_session_cache()
+                                st.rerun()  # Force immediate rerun to refresh the UI
                             except Exception as e:
                                 st.error(f"Error deleting session: {str(e)}")
                     with col4:
@@ -440,6 +504,103 @@ class ChatbotUI:
         
         return session_id, session_name
     
+    def log_payload_size(self, agent, prompt, images, videos, audio, metadata):
+        """Log the approximate size of the payload being sent to the model"""
+        import sys
+        import json
+        
+        # Calculate size of text content
+        text_size = len(prompt.encode('utf-8'))
+        
+        # Calculate size of media
+        media_size = 0
+        for img in images:
+            try:
+                if hasattr(img, '_image_bytes'):
+                    media_size += sys.getsizeof(img._image_bytes)
+                elif hasattr(img, 'filepath'):
+                    import os
+                    media_size += os.path.getsize(img.filepath)
+            except Exception as e:
+                print(f"Error calculating image size: {e}")
+        
+        for vid in videos:
+            try:
+                if hasattr(vid, 'filepath'):
+                    import os
+                    media_size += os.path.getsize(vid.filepath)
+            except Exception as e:
+                print(f"Error calculating video size: {e}")
+        
+        for aud in audio:
+            try:
+                if hasattr(aud, 'filepath'):
+                    import os
+                    media_size += os.path.getsize(aud.filepath)
+            except Exception as e:
+                print(f"Error calculating audio size: {e}")
+        
+        # Calculate size of metadata
+        metadata_size = 0
+        if metadata:
+            metadata_size = len(json.dumps(metadata).encode('utf-8'))
+        
+        # Calculate size of message history
+        history_size = 0
+        if agent.memory and agent.memory.messages:
+            for msg in agent.memory.messages:
+                history_size += len(msg.content.encode('utf-8'))
+                if hasattr(msg, 'metadata') and msg.metadata:
+                    history_size += len(json.dumps(msg.metadata).encode('utf-8'))
+        
+        # Log sizes
+        print(f"PAYLOAD SIZE ANALYSIS:")
+        print(f"  - Text content: {text_size / 1024 / 1024:.2f} MB")
+        print(f"  - Media content: {media_size / 1024 / 1024:.2f} MB")
+        print(f"  - Metadata: {metadata_size / 1024 / 1024:.2f} MB")
+        print(f"  - Message history: {history_size / 1024 / 1024:.2f} MB")
+        print(f"  - Total approximate size: {(text_size + media_size + metadata_size + history_size) / 1024 / 1024:.2f} MB")
+        print(f"  - Gemini limit: 20 MB")
+        
+        # Check if payload is too large
+        total_size = text_size + media_size + metadata_size + history_size
+        if total_size > 20 * 1024 * 1024:  # 20 MB in bytes
+            print("WARNING: Payload size exceeds Gemini's 20 MB limit!")
+            print("Attempting to reduce payload size...")
+            
+            # Clear metadata from previous messages to reduce size
+            if agent.memory and agent.memory.messages:
+                for msg in agent.memory.messages:
+                    if hasattr(msg, 'metadata') and msg.metadata:
+                        # Save a flag indicating there was media, but don't include the references
+                        if 'media_refs' in msg.metadata:
+                            msg.metadata = {'had_media': True}
+                        
+            # Recalculate history size after clearing metadata
+            history_size = 0
+            if agent.memory and agent.memory.messages:
+                for msg in agent.memory.messages:
+                    history_size += len(msg.content.encode('utf-8'))
+                    if hasattr(msg, 'metadata') and msg.metadata:
+                        history_size += len(json.dumps(msg.metadata).encode('utf-8'))
+            
+            # Log new sizes
+            print(f"UPDATED PAYLOAD SIZE AFTER OPTIMIZATION:")
+            print(f"  - Text content: {text_size / 1024 / 1024:.2f} MB")
+            print(f"  - Media content: {media_size / 1024 / 1024:.2f} MB")
+            print(f"  - Metadata: {metadata_size / 1024 / 1024:.2f} MB")
+            print(f"  - Message history: {history_size / 1024 / 1024:.2f} MB")
+            print(f"  - Total approximate size: {(text_size + media_size + metadata_size + history_size) / 1024 / 1024:.2f} MB")
+        
+        return agent.run(
+            prompt,
+            stream=True,
+            images=images,
+            videos=videos,
+            audio=audio,
+            metadata=metadata
+        )
+
     def render_chat(self, agent):
         """Render chat interface for the given agent"""
         if not agent:
@@ -524,9 +685,17 @@ class ChatbotUI:
         # Display uploaded files in a collapsible section right before chat input
         if st.session_state.uploaded_files:
             with st.expander("📎 Uploaded Files", expanded=True):
-                cols = st.columns(min(3, len(st.session_state.uploaded_files)))
+                # Add a "Clear All" button at the top
+                st.info("Files will be cleared automatically after sending a message. You can also clear them manually.")
+                if st.button("🗑️ Clear All Uploads", key="clear_all_uploads"):
+                    self.clear_uploaded_files()
+                    st.rerun()
+                
+                # Display each file with a delete button
                 for idx, file in enumerate(st.session_state.uploaded_files):
-                    with cols[idx % 3]:
+                    col1, col2 = st.columns([20, 1])
+                    
+                    with col1:
                         st.write(f"**{file['name']}**")
                         if file['type'] == 'image':
                             st.image(file['data'])
@@ -545,6 +714,12 @@ class ChatbotUI:
                                 )
                             except Exception as e:
                                 st.error(f"Error displaying text content from {file['name']}: {str(e)}")
+                    
+                    # Add delete button for each file
+                    with col2:
+                        if st.button("🗑️", key=f"delete_file_{idx}", help=f"Delete {file['name']}"):
+                            self.delete_uploaded_file(idx)
+                            st.rerun()
         
         # Chat input
         if prompt := st.chat_input("Type your message here..."):
@@ -585,6 +760,72 @@ class ChatbotUI:
                     
                     # Log conversation state after web search
                     self.manager._log_conversation_state(agent, "After web search")
+                    
+                    # Clear uploaded files after they've been used in the conversation
+                    if st.session_state.uploaded_files:
+                        st.session_state.uploaded_files = []
+                        st.session_state.file_upload_rerun = True
+                    
+                    return
+            
+            # Check if research assistant is enabled
+            if st.session_state.use_research_assistant:
+                with st.spinner("Conducting research..."):
+                    # Add user's query to memory
+                    user_message = Message(role="user", content=prompt)
+                    agent.memory.add_message(user_message)
+                    
+                    # Display user message
+                    with st.chat_message("user"):
+                        st.markdown(prompt)
+                    
+                    # Create a research agent and generate report
+                    from research import ResearchAgent
+                    research_agent = ResearchAgent()
+                    
+                    # Stream the research results
+                    full_response = ""
+                    message_placeholder = st.empty()
+                    
+                    with st.chat_message("assistant"):
+                        for response in research_agent.generate_research_report(prompt, stream=True):
+                            if response.content:
+                                full_response += response.content
+                                # Format the streaming response
+                                preview, _ = self.format_chat_message(full_response)
+                                message_placeholder.markdown(preview + "▌")
+                        
+                        # After streaming completes, show the full response with expander if needed
+                        preview, full_content = self.format_chat_message(full_response)
+                        if preview != full_content:
+                            message_placeholder.markdown(preview)
+                            with st.expander("Show full response", expanded=False):
+                                st.markdown(full_content)
+                        else:
+                            message_placeholder.markdown(full_content)
+                    
+                    # Add research results to memory with simple metadata
+                    assistant_message = Message(
+                        role="assistant", 
+                        content=full_response,
+                        metadata={
+                            "type": "research_report",
+                            "query": prompt
+                        }
+                    )
+                    agent.memory.add_message(assistant_message)
+                    
+                    # Save the updated memory to storage
+                    agent.write_to_storage()
+                    
+                    # Log conversation state after research
+                    self.manager._log_conversation_state(agent, "After research response")
+                    
+                    # Clear uploaded files after they've been used in the conversation
+                    if st.session_state.uploaded_files:
+                        st.session_state.uploaded_files = []
+                        st.session_state.file_upload_rerun = True
+                    
                     return
             
             # Process text files and append their content to the prompt
@@ -685,13 +926,13 @@ class ChatbotUI:
                     print(f"Creating new message with metadata: {metadata}")
                 
                 # Stream the response with media objects
-                for response in agent.run(
+                for response in self.log_payload_size(
+                    agent,
                     prompt,
-                    stream=True,
-                    images=media_objects['images'],
-                    videos=media_objects['videos'],
-                    audio=media_objects['audio'],
-                    metadata=metadata  # Add metadata to the message
+                    media_objects['images'],
+                    media_objects['videos'],
+                    media_objects['audio'],
+                    metadata
                 ):
                     if response.content:
                         full_response += response.content
@@ -716,6 +957,11 @@ class ChatbotUI:
                 
                 # Log conversation state after response
                 self.manager._log_conversation_state(agent, "After model response")
+            
+                # Clear uploaded files after they've been used in the conversation
+                if st.session_state.uploaded_files:
+                    st.session_state.uploaded_files = []
+                    st.session_state.file_upload_rerun = True
             
             # Manage context after each interaction
             #self.manager.manage_context(agent) 

@@ -71,7 +71,7 @@ class ChatbotManager:
                 metadata_dict = {}
                 for message_id, metadata_json in cursor:
                     metadata_dict[message_id] = json.loads(metadata_json)
-                logger.debug(f"Loaded metadata for session {session_id}: {metadata_dict}")
+                logger.debug(f"Loaded metadata for session {session_id}: {len(metadata_dict)} messages")
                 return metadata_dict
         except Exception as e:
             logger.error(f"Error loading media metadata: {str(e)}")
@@ -96,6 +96,25 @@ class ChatbotManager:
         logger.debug(f"{stage} - Conversation state:")
         logger.debug(json.dumps(messages, indent=2))
     
+    def clean_media_references(self, agent: Agent):
+        """Clean up media references in agent memory to reduce payload size"""
+        if not agent.memory or not agent.memory.messages:
+            return
+            
+        # Keep only the most recent 3 messages with full media references
+        # For older messages, replace media_refs with a simple flag
+        if len(agent.memory.messages) > 6:  # Only clean if we have more than 6 messages (3 turns)
+            # Skip system messages
+            user_assistant_messages = [msg for msg in agent.memory.messages if msg.role != 'system']
+            
+            # Process all but the 6 most recent messages
+            for msg in user_assistant_messages[:-6]:
+                if hasattr(msg, 'metadata') and msg.metadata and 'media_refs' in msg.metadata:
+                    # Replace with simplified metadata
+                    msg.metadata = {'had_media': True}
+            
+            logger.debug(f"Cleaned media references from {len(user_assistant_messages) - 6} messages")
+            
     def create_agent(self, session_id: str = None, session_name: str = None) -> Agent:
         """Create and return a configured chatbot agent"""
         memory = AgentMemory(
@@ -127,7 +146,7 @@ class ChatbotManager:
             
             # Load media metadata from our table
             stored_metadata = self._load_media_metadata(session_id)
-            logger.debug(f"Loaded media metadata from database: {stored_metadata}")
+            logger.debug(f"Loaded media metadata from database: {len(stored_metadata)} messages")
             
             # Restore metadata for each message
             if agent.memory and agent.memory.messages:
@@ -140,7 +159,10 @@ class ChatbotManager:
                     msg_id = f"{msg.role}_{agent.memory.messages.index(msg)}"
                     if msg_id in stored_metadata:
                         msg.metadata = stored_metadata[msg_id].copy()
-                        logger.debug(f"Restored metadata for message {msg_id}: {msg.metadata}")
+                        logger.debug(f"Restored metadata for message {msg_id}")
+            
+            # Clean up old media references to reduce payload size
+            self.clean_media_references(agent)
             
             self._log_conversation_state(agent, "After session load")
             
@@ -149,8 +171,29 @@ class ChatbotManager:
     def save_message_metadata(self, agent: Agent, message_id: str, metadata: dict):
         """Save metadata for a specific message"""
         if agent.session_id:
-            self._save_media_metadata(agent.session_id, message_id, metadata)
-            logger.debug(f"Saved metadata for message {message_id} in session {agent.session_id}")
+            # Create a simplified version of the metadata to reduce storage size
+            simplified_metadata = {}
+            
+            # Only store essential information about media references
+            if 'media_refs' in metadata:
+                simplified_refs = []
+                for ref in metadata['media_refs']:
+                    simplified_ref = {
+                        'type': ref['type'],
+                        'original_name': ref['original_name'],
+                        'stored_path': ref['stored_path']
+                    }
+                    simplified_refs.append(simplified_ref)
+                simplified_metadata['media_refs'] = simplified_refs
+            
+            # Copy other metadata fields
+            for key, value in metadata.items():
+                if key != 'media_refs':
+                    simplified_metadata[key] = value
+            
+            # Save the simplified metadata
+            self._save_media_metadata(agent.session_id, message_id, simplified_metadata)
+            logger.debug(f"Saved simplified metadata for message {message_id} in session {agent.session_id}")
             
     def list_sessions(self) -> list:
         """Get all available sessions"""
@@ -175,6 +218,17 @@ class ChatbotManager:
             # Delete session using Agno storage
             logger.debug("Attempting to delete session from database...")
             self.storage.delete_session(session_id=session_id)
+            
+            # Verify that the session was actually deleted
+            remaining_sessions = self.storage.get_all_session_ids()
+            if session_id in remaining_sessions:
+                logger.error(f"Session {session_id} still exists after deletion attempt")
+                # Force delete using direct SQL if Agno storage deletion failed
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute("DELETE FROM chat_sessions WHERE session_id = ?", (session_id,))
+                    conn.commit()
+                logger.debug("Forced session deletion using direct SQL")
+            
             logger.debug("Session deleted from database successfully")
                 
         except Exception as e:
