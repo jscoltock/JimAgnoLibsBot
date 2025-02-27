@@ -26,50 +26,52 @@ youtube_agent = Agent(
     tools=[YouTubeTools()],
     show_tool_calls=True,
     instructions=dedent("""\
-        You are an expert YouTube content analyst with a keen eye for detail! 🎓
-        Follow these steps for comprehensive video analysis:
-        1. Video Overview
-           - Check video length and basic metadata
-           - Identify video type (tutorial, review, lecture, etc.)
-           - Note the content structure
-        2. Timestamp Creation
-           - Create precise, meaningful timestamps
-           - Focus on major topic transitions
-           - Highlight key moments and demonstrations
-           - Format: [start_time, end_time, detailed_summary]
-        3. Content Organization
-           - Group related segments
-           - Identify main themes
-           - Track topic progression
+        What are the key ideas in this video?"""
+        # You are an expert YouTube content analyst with a keen eye for detail! 🎓
+        # Follow these steps for comprehensive video analysis:
+        # 1. Video Overview
+        #    - Check video length and basic metadata
+        #    - Identify video type (tutorial, review, lecture, etc.)
+        #    - Note the content structure
+        # 2. Timestamp Creation
+        #    - Create precise, meaningful timestamps
+        #    - Focus on major topic transitions
+        #    - Highlight key moments and demonstrations
+        #    - Format: [start_time, end_time, detailed_summary]
+        # 3. Content Organization
+        #    - Group related segments
+        #    - Identify main themes
+        #    - Track topic progression
 
-        Your analysis style:
-        - Begin with a video overview
-        - Then give a summary of the video
-        - Use clear, descriptive segment titles
-        - Include relevant emojis for content types:
-          📚 Educational
-          💻 Technical
-          🎮 Gaming
-          📱 Tech Review
-          🎨 Creative
-        - Highlight key learning points
-        - Note practical demonstrations
-        - Mark important references
+        # Your analysis style:
+        # - Begin with a video overview
+        # - Then give a detailed summary of the video
+        # - Use clear, descriptive segment titles
+        # - Include relevant emojis for content types:
+        #   📚 Educational
+        #   💻 Technical
+        #   🎮 Gaming
+        #   📱 Tech Review
+        #   🎨 Creative
+        # - Highlight key learning points
+        # - Note practical demonstrations
+        # - Mark important references
 
-        Quality Guidelines:
-        - Verify timestamp accuracy
-        - Avoid timestamp hallucination
-        - Ensure comprehensive coverage
-        - Maintain consistent detail level
-        - Focus on valuable content markers
-    """),
+        # Quality Guidelines:
+        # - Verify timestamp accuracy
+        # - Avoid timestamp hallucination
+        # - Ensure comprehensive coverage
+        # - Maintain consistent detail level
+        # - Focus on valuable content markers
+    #"""
+    ),
     add_datetime_to_instructions=True,
     markdown=True,
 )
 
 # Example usage with different types of videos
 youtube_agent.print_response(
-    "Analyze this video: https://www.youtube.com/watch?v=eXdVDhOGqoE",
+    "Analyze this video: https://www.youtube.com/watch?v=izHDm4Vf3lQ",
     stream=True,
 )
 
