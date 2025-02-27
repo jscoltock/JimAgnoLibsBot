@@ -34,7 +34,45 @@ TEMP_VIDEO_DIR.mkdir(exist_ok=True)
 logger = logging.getLogger(__name__)
 
 class ChatbotUI:
+    """Main UI class for the chatbot application"""
+    
     def __init__(self):
+        """Initialize the UI components and session state"""
+        # Initialize session state variables if they don't exist
+        if 'uploaded_files' not in st.session_state:
+            st.session_state.uploaded_files = []
+        if 'message_metadata' not in st.session_state:
+            st.session_state.message_metadata = {}
+        if 'show_delete_confirm' not in st.session_state:
+            st.session_state.show_delete_confirm = False
+        if 'delete_session_id' not in st.session_state:
+            st.session_state.delete_session_id = None
+        if 'delete_session_name' not in st.session_state:
+            st.session_state.delete_session_name = None
+        if 'last_session' not in st.session_state:
+            st.session_state.last_session = None
+        if 'selected_model' not in st.session_state:
+            st.session_state.selected_model = DEFAULT_MODEL
+        if 'use_web_search' not in st.session_state:
+            st.session_state.use_web_search = False
+        if 'use_youtube_summary' not in st.session_state:
+            st.session_state.use_youtube_summary = False
+        if 'use_research_assistant' not in st.session_state:
+            st.session_state.use_research_assistant = False
+        if 'num_pages' not in st.session_state:
+            st.session_state.num_pages = 3
+            
+        # New rerun control flags
+        if 'needs_rerun' not in st.session_state:
+            st.session_state.needs_rerun = False
+        if 'file_upload_rerun' not in st.session_state:
+            st.session_state.file_upload_rerun = False
+        if 'session_switch_rerun' not in st.session_state:
+            st.session_state.session_switch_rerun = False
+        if 'message_delete_rerun' not in st.session_state:
+            st.session_state.message_delete_rerun = False
+        
+        # Initialize the manager
         self.manager = ChatbotManager()
         self.initialize_session_state()
         
@@ -152,25 +190,30 @@ class ChatbotUI:
         
     @staticmethod
     def handle_file_upload():
-        """Callback to handle file upload changes"""
-        # Clear existing files first
-        st.session_state.uploaded_files = []
-        st.session_state.media_refs = []
-        
-        # Process new files if any
-        if st.session_state.file_uploader:
-            for file in st.session_state.file_uploader:
+        """Handle file upload and store in session state"""
+        uploaded_files = st.session_state.file_uploader
+        if uploaded_files:
+            for file in uploaded_files:
+                # Check if file is already in session state
+                if any(f['name'] == file.name for f in st.session_state.uploaded_files):
+                    continue
+                    
+                # Get file type
                 file_type = ChatbotUI.get_file_type(file)
-                if file_type:
-                    file_data = {
-                        'name': file.name,
-                        'data': file.getvalue(),
-                        'type': file_type
-                    }
-                    st.session_state.uploaded_files.append(file_data)
+                if not file_type:
+                    st.error(f"Unsupported file type: {file.name}")
+                    continue
+                
+                # Store file data and metadata
+                file_data = {
+                    'name': file.name,
+                    'type': file_type,
+                    'data': file.read()
+                }
+                st.session_state.uploaded_files.append(file_data)
         
-        # Force a rerun to update the UI
-        st.rerun()
+        # Set flag to trigger rerun instead of calling st.rerun() directly
+        st.session_state.file_upload_rerun = True
         
     @staticmethod
     def get_file_type(file):
@@ -306,7 +349,7 @@ class ChatbotUI:
                     if "last_session" not in st.session_state or st.session_state.last_session != "new":
                         st.session_state.last_session = "new"
                         self._save_last_session("")  # Clear last session when creating new
-                        st.rerun()
+                        st.session_state.session_switch_rerun = True
                     return None, session_name.strip()
                 st.warning("Please enter a session name")
                 st.stop()
@@ -322,6 +365,7 @@ class ChatbotUI:
                         st.session_state.show_delete_confirm = True
                         st.session_state.delete_session_id = session_id
                         st.session_state.delete_session_name = session_name
+                        st.session_state.needs_rerun = True
                 
                 # Handle delete confirmation
                 if st.session_state.get('show_delete_confirm', False) and st.session_state.get('delete_session_id') == session_id:
@@ -341,19 +385,18 @@ class ChatbotUI:
                                 # Clear the last session file
                                 self._save_last_session("")
                                 st.session_state.show_delete_confirm = False
-                                # Force reload to show updated session list
-                                st.rerun()
+                                st.session_state.session_switch_rerun = True
                             except Exception as e:
                                 st.error(f"Error deleting session: {str(e)}")
                     with col4:
                         if st.button("Cancel", type="secondary", key=f"cancel_delete_{session_id}"):
                             st.session_state.show_delete_confirm = False
-                            st.rerun()
+                            st.session_state.needs_rerun = True
                 
                 if "last_session" not in st.session_state or st.session_state.last_session != session_id:
                     st.session_state.last_session = session_id
                     self._save_last_session(session_id)  # Save the selected session
-                    st.rerun()
+                    st.session_state.session_switch_rerun = True
         
         # Display current session info outside the expander
         st.sidebar.markdown("---")
@@ -476,7 +519,7 @@ class ChatbotUI:
                             del st.session_state.message_metadata[message_id]
                         # Update session in storage
                         agent.write_to_storage()
-                        st.rerun()
+                        st.session_state.message_delete_rerun = True
         
         # Display uploaded files in a collapsible section right before chat input
         if st.session_state.uploaded_files:
@@ -676,3 +719,32 @@ class ChatbotUI:
             
             # Manage context after each interaction
             #self.manager.manage_context(agent) 
+
+    def run(self):
+        """Run the chatbot UI"""
+        # Check for rerun flags at the start
+        if st.session_state.file_upload_rerun:
+            st.session_state.file_upload_rerun = False
+            st.rerun()
+            
+        if st.session_state.session_switch_rerun:
+            st.session_state.session_switch_rerun = False
+            st.rerun()
+            
+        if st.session_state.message_delete_rerun:
+            st.session_state.message_delete_rerun = False
+            st.rerun()
+            
+        if st.session_state.needs_rerun:
+            st.session_state.needs_rerun = False
+            st.rerun()
+            
+        # Set up the page
+        st.set_page_config(
+            page_title="Multimodal Chatbot",
+            page_icon="🤖",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+
+        # ... rest of the existing code ... 
