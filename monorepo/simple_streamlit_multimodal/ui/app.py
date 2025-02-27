@@ -501,6 +501,10 @@ class ChatbotUI:
                     key="num_pages",
                     help="Number of web pages to search and summarize"
                 )
+            
+            # Show YouTube Summary instructions when selected
+            if selected_tool == "Youtube Summary":
+                st.info("Paste a YouTube URL in the chat to generate a detailed summary with timestamps and key points.")
         
         return session_id, session_name
     
@@ -827,6 +831,80 @@ class ChatbotUI:
                         st.session_state.file_upload_rerun = True
                     
                     return
+            
+            # Check if YouTube summary is enabled
+            if st.session_state.use_youtube_summary:
+                # Check if the prompt contains a YouTube URL
+                import re
+                youtube_url_pattern = r'(https?://)?(www\.)?(youtube\.com|youtu\.be)/[^\s]+'
+                youtube_urls = re.findall(youtube_url_pattern, prompt)
+                
+                if youtube_urls:
+                    with st.spinner("Analyzing YouTube video..."):
+                        # Extract the full YouTube URL from the prompt
+                        full_url_match = re.search(youtube_url_pattern, prompt)
+                        if full_url_match:
+                            youtube_url = full_url_match.group(0)
+                            
+                            # Add user's query to memory
+                            user_message = Message(role="user", content=prompt)
+                            agent.memory.add_message(user_message)
+                            
+                            # Display user message
+                            with st.chat_message("user"):
+                                st.markdown(prompt)
+                            
+                            # Create a YouTube summary agent and generate summary
+                            from youtube import YouTubeSummaryAgent
+                            youtube_agent = YouTubeSummaryAgent()
+                            
+                            # Stream the YouTube summary results
+                            full_response = ""
+                            message_placeholder = st.empty()
+                            
+                            with st.chat_message("assistant"):
+                                for response in youtube_agent.generate_video_summary(youtube_url, stream=True):
+                                    if response.content:
+                                        full_response += response.content
+                                        # Format the streaming response
+                                        preview, _ = self.format_chat_message(full_response)
+                                        message_placeholder.markdown(preview + "▌")
+                                
+                                # After streaming completes, show the full response with expander if needed
+                                preview, full_content = self.format_chat_message(full_response)
+                                if preview != full_content:
+                                    message_placeholder.markdown(preview)
+                                    with st.expander("Show full response", expanded=False):
+                                        st.markdown(full_content)
+                                else:
+                                    message_placeholder.markdown(full_content)
+                            
+                            # Add YouTube summary results to memory with simple metadata
+                            assistant_message = Message(
+                                role="assistant", 
+                                content=full_response,
+                                metadata={
+                                    "type": "youtube_summary",
+                                    "video_url": youtube_url
+                                }
+                            )
+                            agent.memory.add_message(assistant_message)
+                            
+                            # Save the updated memory to storage
+                            agent.write_to_storage()
+                            
+                            # Log conversation state after YouTube summary
+                            self.manager._log_conversation_state(agent, "After YouTube summary")
+                            
+                            # Clear uploaded files after they've been used in the conversation
+                            if st.session_state.uploaded_files:
+                                st.session_state.uploaded_files = []
+                                st.session_state.file_upload_rerun = True
+                            
+                            return
+                else:
+                    # If YouTube summary is enabled but no YouTube URL is found, show a message
+                    st.info("Please provide a YouTube URL to generate a summary.")
             
             # Process text files and append their content to the prompt
             text_contents = []
