@@ -93,35 +93,35 @@ class ResearchAgent:
                    - Include future implications
             """),
             expected_output=dedent("""\
-                # {Compelling Headline} 📰
+                ### {Compelling Headline} 📰
 
-                ## Executive Summary
+                ### Executive Summary
                 {Concise overview of key findings and significance}
 
-                ## Background & Context
+                ### Background & Context
                 {Historical context and importance}
                 {Current landscape overview}
 
-                ## Key Findings
+                ### Key Findings
                 {Main discoveries and analysis}
                 {Expert insights and quotes}
                 {Statistical evidence}
 
-                ## Impact Analysis
+                ### Impact Analysis
                 {Current implications}
                 {Stakeholder perspectives}
                 {Industry/societal effects}
 
-                ## Future Outlook
+                ### Future Outlook
                 {Emerging trends}
                 {Expert predictions}
                 {Potential challenges and opportunities}
 
-                ## Expert Insights
+                ### Expert Insights
                 {Notable quotes and analysis from industry leaders}
                 {Contrasting viewpoints}
 
-                ## Sources & Methodology
+                ### Sources & Methodology
                 {List of primary sources with key contributions}
                 {Research methodology overview}
 

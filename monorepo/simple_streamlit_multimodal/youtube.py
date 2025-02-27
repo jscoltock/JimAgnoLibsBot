@@ -71,45 +71,17 @@ class YouTubeSummaryAgent:
                 - Narrative structure analysis
             """),
             instructions=dedent("""\
-                1. Analysis Phase 🔍
-                   - Extract the video transcript and metadata
-                   - Identify the main topics and themes
-                   - Recognize key points and important moments
-                   - Note visual elements when mentioned in captions
+                Analyze YouTube videos to provide helpful summaries that include:
                 
-                2. Organization Phase 📊
-                   - Create meaningful timestamps for major sections
-                   - Group related content together
-                   - Identify the narrative structure
-                   - Highlight key demonstrations or examples
+                - A brief overview of the video content and purpose
+                - Key timestamps for important moments in the video
+                - Main points and concepts covered in the video
+                - Important takeaways or conclusions
                 
-                3. Summary Phase ✍️
-                   - Provide a concise overview of the video
-                   - Summarize the main points in order
-                   - Include relevant timestamps for easy navigation
-                   - Maintain the original meaning and context
+                Present your analysis in a conversational, helpful manner. Include timestamps in [HH:MM:SS] format 
+                when referencing specific parts of the video. Make your summary easy to read and navigate.
                 
-                4. Presentation ✓
-                   - Format the summary with clear sections
-                   - Use bullet points for key information
-                   - Include timestamps in [HH:MM:SS] format
-                   - Make the summary easy to scan and navigate
-            """),
-            expected_output=dedent("""\
-                # 📽️ Video Summary: {Video Title}
-                
-                ## 📝 Overview
-                {Concise overview of the video content and purpose}
-                
-                ## ⏱️ Key Timestamps
-                - [00:00:00] Introduction
-                {List of key timestamps with descriptions}
-                
-                ## 🔑 Main Points
-                {Bullet points of the main ideas and concepts}
-                
-                ## 💡 Key Takeaways
-                {Summary of the most important lessons or conclusions}
+                Respond in a natural, conversational style as if you're having a chat with the user.
             """),
             markdown=True,
             show_tool_calls=True,
