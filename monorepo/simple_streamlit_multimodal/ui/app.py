@@ -196,6 +196,11 @@ class ChatbotUI:
         if "session_selector" in st.session_state:
             del st.session_state.session_selector
         
+        # Clear message metadata to prevent cross-contamination between sessions
+        if "message_metadata" in st.session_state:
+            st.session_state.message_metadata = {}
+            print("Cleared message metadata from session state to prevent cross-contamination")
+        
         # Clear any other session-related cache
         st.session_state.current_session_id = None
         st.session_state.agent = None
@@ -647,8 +652,9 @@ class ChatbotUI:
         # Display messages from agent memory
         if agent.memory and agent.memory.messages:
             for idx, msg in enumerate(agent.memory.messages):
-                # Generate a unique message ID
-                message_id = f"{msg.role}_{idx}"
+                # Generate a unique message ID that includes the session ID
+                session_prefix = agent.session_id if agent.session_id else "temp"
+                message_id = f"{session_prefix}_{msg.role}_{idx}"
                 
                 # Create columns for message and delete button
                 msg_col, del_col = st.columns([20, 1])
@@ -676,15 +682,11 @@ class ChatbotUI:
                                 agent.session_data = {}
                             if 'message_metadata' not in agent.session_data:
                                 agent.session_data['message_metadata'] = {}
-                            agent.session_data['message_metadata'][message_id] = metadata.copy()
-                            
+                            agent.session_data['message_metadata'][message_id] = metadata.copy()  # Make a copy to prevent reference issues
                             # Ensure storage is updated immediately
                             agent.write_to_storage()
                             print(f"Saved metadata to storage for message {message_id}: {metadata}")
                             
-                            # Also update session state
-                            st.session_state.message_metadata[message_id] = metadata.copy()
-                        
                         # Display media if present in metadata
                         if metadata:
                             # Debug: Log metadata for this message
@@ -1032,7 +1034,8 @@ class ChatbotUI:
                                         st.error(f"Unable to display media: {media_ref['original_name']}")
                     
                     # Save metadata for user message
-                    message_id = f"user_{len(agent.memory.messages)}"
+                    session_prefix = agent.session_id if agent.session_id else "temp"
+                    message_id = f"{session_prefix}_user_{len(agent.memory.messages)}"
                     metadata = {
                         'media_refs': media_objects['media_refs'],
                         'has_media': True
@@ -1087,7 +1090,8 @@ class ChatbotUI:
                 
                 # After streaming completes, store metadata for the new message
                 if metadata:
-                    message_id = f"assistant_{len(agent.memory.messages)}"
+                    session_prefix = agent.session_id if agent.session_id else "temp"
+                    message_id = f"{session_prefix}_assistant_{len(agent.memory.messages)}"
                     self.manager.save_message_metadata(agent, message_id, metadata)
                     
                     # Also store in agent session data for immediate persistence
@@ -1162,5 +1166,46 @@ class ChatbotUI:
             layout="wide",
             initial_sidebar_state="expanded"
         )
-
-        # ... rest of the existing code ... 
+        
+        # Create main layout
+        st.title("Multimodal Chatbot")
+        
+        # Render session selector in sidebar
+        session_id, session_name = self.render_session_selector()
+        
+        # Store current session ID in session state
+        st.session_state.current_session_id = session_id
+        
+        # Filter message metadata to only include entries for the current session
+        # This prevents cross-contamination between sessions
+        if 'message_metadata' in st.session_state and session_id:
+            filtered_metadata = {}
+            session_prefix = session_id
+            for key, value in st.session_state.message_metadata.items():
+                if key.startswith(f"{session_prefix}_"):
+                    filtered_metadata[key] = value
+            
+            # Replace with filtered metadata
+            st.session_state.message_metadata = filtered_metadata
+            print(f"Filtered message metadata for session {session_id}: {len(filtered_metadata)} entries")
+        
+        # Create or load agent
+        if session_id:
+            # Load existing session
+            agent = self.manager.create_agent(session_id=session_id)
+            st.session_state.agent = agent
+        else:
+            # Create new session with provided name
+            agent = self.manager.create_agent(session_name=session_name)
+            st.session_state.agent = agent
+            
+            # Save the session ID
+            st.session_state.current_session_id = agent.session_id
+            self._save_last_session(agent.session_id)
+            
+            # Add a welcome message
+            with st.chat_message("assistant"):
+                st.markdown(f"Hello! I'm your multimodal assistant. How can I help you today?")
+        
+        # Render chat interface
+        self.render_chat(agent) 

@@ -176,16 +176,30 @@ class ChatbotManager:
             
             # Restore metadata for each message
             if agent.memory and agent.memory.messages:
-                for msg in agent.memory.messages:
+                for idx, msg in enumerate(agent.memory.messages):
                     # Skip system messages
                     if msg.role == 'system':
                         continue
                         
-                    # Get stored metadata for this message
-                    msg_id = f"{msg.role}_{agent.memory.messages.index(msg)}"
+                    # Get stored metadata for this message using session-specific ID
+                    session_prefix = agent.session_id
+                    msg_id = f"{session_prefix}_{msg.role}_{idx}"
+                    
+                    # Check if we have metadata for this message
                     if msg_id in stored_metadata:
                         msg.metadata = stored_metadata[msg_id].copy()
                         logger.debug(f"Restored metadata for message {msg_id}")
+                    else:
+                        # Try the old format for backward compatibility
+                        old_msg_id = f"{msg.role}_{idx}"
+                        if old_msg_id in stored_metadata:
+                            # Found metadata in old format, copy it to the new format
+                            msg.metadata = stored_metadata[old_msg_id].copy()
+                            # Save it with the new ID format
+                            self._save_media_metadata(agent.session_id, msg_id, msg.metadata)
+                            logger.debug(f"Migrated metadata from old format {old_msg_id} to new format {msg_id}")
+                        else:
+                            logger.debug(f"No metadata found for message {msg_id}")
             
             # Clean up old media references to reduce payload size
             self.clean_media_references(agent)
