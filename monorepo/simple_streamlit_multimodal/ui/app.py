@@ -61,6 +61,8 @@ class ChatbotUI:
             st.session_state.use_research_assistant = False
         if 'num_pages' not in st.session_state:
             st.session_state.num_pages = 3
+        if 'file_uploader_key' not in st.session_state:
+            st.session_state.file_uploader_key = 0
             
         # New rerun control flags
         if 'needs_rerun' not in st.session_state:
@@ -208,6 +210,10 @@ class ChatbotUI:
         # This clears the files from the session state, but they remain in the chat history
         # if they were already used in a conversation
         st.session_state.uploaded_files = []
+        
+        # Increment the file uploader key to reset the widget
+        st.session_state.file_uploader_key += 1
+        
         st.session_state.file_upload_rerun = True
         
     @staticmethod
@@ -217,12 +223,21 @@ class ChatbotUI:
         # if it was already used in a conversation
         if 0 <= index < len(st.session_state.uploaded_files):
             st.session_state.uploaded_files.pop(index)
+            
+            # If all files are deleted, increment the file uploader key to reset the widget
+            if len(st.session_state.uploaded_files) == 0:
+                st.session_state.file_uploader_key += 1
+                
             st.session_state.file_upload_rerun = True
         
     @staticmethod
     def handle_file_upload():
         """Handle file upload and store in session state"""
-        uploaded_files = st.session_state.file_uploader
+        # Get the current file uploader key
+        current_key = f"file_uploader_{st.session_state.file_uploader_key}"
+        
+        # Access the uploaded files using the dynamic key
+        uploaded_files = st.session_state.get(current_key)
         if uploaded_files:
             for file in uploaded_files:
                 # Check if file is already in session state
@@ -473,7 +488,7 @@ class ChatbotUI:
                 "Choose files",
                 type=['png', 'jpg', 'jpeg', 'mp4', 'avi', '.mov', 'mp3', 'wav', 'txt', 'pdf'],
                 accept_multiple_files=True,
-                key="file_uploader",
+                key=f"file_uploader_{st.session_state.file_uploader_key}",
                 on_change=ChatbotUI.handle_file_upload
             )
         
@@ -689,41 +704,29 @@ class ChatbotUI:
         # Display uploaded files in a collapsible section right before chat input
         if st.session_state.uploaded_files:
             with st.expander("📎 Uploaded Files", expanded=True):
-                # Add a "Clear All" button at the top
-                st.info("Files will be cleared automatically after sending a message. You can also clear them manually.")
-                if st.button("🗑️ Clear All Uploads", key="clear_all_uploads"):
-                    self.clear_uploaded_files()
-                    st.rerun()
+                # Only show informational message, no clear button
+                st.info("Files will be cleared automatically after sending a message.")
                 
-                # Display each file with a delete button
+                # Display each file without delete buttons
                 for idx, file in enumerate(st.session_state.uploaded_files):
-                    col1, col2 = st.columns([20, 1])
-                    
-                    with col1:
-                        st.write(f"**{file['name']}**")
-                        if file['type'] == 'image':
-                            st.image(file['data'])
-                        elif file['type'] == 'video':
-                            st.video(file['data'])
-                        elif file['type'] == 'audio':
-                            st.audio(file['data'])
-                        elif file['type'] == 'text':
-                            try:
-                                text_content = self.safe_decode_text(file['data'], file['name'])
-                                st.text_area(
-                                    "Text Content",
-                                    value=text_content[:500] + '...' if len(text_content) > 500 else text_content,
-                                    height=150,
-                                    disabled=True
-                                )
-                            except Exception as e:
-                                st.error(f"Error displaying text content from {file['name']}: {str(e)}")
-                    
-                    # Add delete button for each file
-                    with col2:
-                        if st.button("🗑️", key=f"delete_file_{idx}", help=f"Delete {file['name']}"):
-                            self.delete_uploaded_file(idx)
-                            st.rerun()
+                    st.write(f"**{file['name']}**")
+                    if file['type'] == 'image':
+                        st.image(file['data'])
+                    elif file['type'] == 'video':
+                        st.video(file['data'])
+                    elif file['type'] == 'audio':
+                        st.audio(file['data'])
+                    elif file['type'] == 'text':
+                        try:
+                            text_content = self.safe_decode_text(file['data'], file['name'])
+                            st.text_area(
+                                "Text Content",
+                                value=text_content[:500] + '...' if len(text_content) > 500 else text_content,
+                                height=150,
+                                disabled=True
+                            )
+                        except Exception as e:
+                            st.error(f"Error displaying text content from {file['name']}: {str(e)}")
         
         # Chat input
         if prompt := st.chat_input("Type your message here..."):
@@ -768,7 +771,10 @@ class ChatbotUI:
                     # Clear uploaded files after they've been used in the conversation
                     if st.session_state.uploaded_files:
                         st.session_state.uploaded_files = []
+                        # Increment the file uploader key to reset the widget
+                        st.session_state.file_uploader_key += 1
                         st.session_state.file_upload_rerun = True
+                        st.rerun()  # Force immediate rerun to clear files
                     
                     return
             
@@ -828,7 +834,10 @@ class ChatbotUI:
                     # Clear uploaded files after they've been used in the conversation
                     if st.session_state.uploaded_files:
                         st.session_state.uploaded_files = []
+                        # Increment the file uploader key to reset the widget
+                        st.session_state.file_uploader_key += 1
                         st.session_state.file_upload_rerun = True
+                        st.rerun()  # Force immediate rerun to clear files
                     
                     return
             
@@ -899,7 +908,10 @@ class ChatbotUI:
                             # Clear uploaded files after they've been used in the conversation
                             if st.session_state.uploaded_files:
                                 st.session_state.uploaded_files = []
+                                # Increment the file uploader key to reset the widget
+                                st.session_state.file_uploader_key += 1
                                 st.session_state.file_upload_rerun = True
+                                st.rerun()  # Force immediate rerun to clear files
                             
                             return
                 else:
@@ -1036,10 +1048,13 @@ class ChatbotUI:
                 # Log conversation state after response
                 self.manager._log_conversation_state(agent, "After model response")
             
-                # Clear uploaded files after they've been used in the conversation
-                if st.session_state.uploaded_files:
-                    st.session_state.uploaded_files = []
-                    st.session_state.file_upload_rerun = True
+            # Clear uploaded files after they've been used in the conversation
+            if st.session_state.uploaded_files:
+                st.session_state.uploaded_files = []
+                # Increment the file uploader key to reset the widget
+                st.session_state.file_uploader_key += 1
+                st.session_state.file_upload_rerun = True
+                st.rerun()  # Force immediate rerun to clear files
             
             # Manage context after each interaction
             #self.manager.manage_context(agent) 
