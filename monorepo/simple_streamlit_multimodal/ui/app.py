@@ -467,7 +467,7 @@ class ChatbotUI:
         st.sidebar.markdown(f"**Current Session:** {session_name}")
         
         # File uploader in expander
-        with st.sidebar.expander("📎 Upload Files", expanded=False):
+        with st.sidebar.expander("📎 Upload Files", expanded=True):
             # File uploader with callback - add PDF to accepted types
             _ = st.file_uploader(
                 "Choose files",
@@ -478,7 +478,7 @@ class ChatbotUI:
             )
         
         # Tools controls in expander
-        with st.sidebar.expander("🛠️ Tools", expanded=False):
+        with st.sidebar.expander("🛠️ Tools", expanded=True):
             selected_tool = st.radio(
                 "Select Tool",
                 options=["None", "Web Search", "Youtube Summary", "Research Assistant"],
