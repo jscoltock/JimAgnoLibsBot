@@ -625,6 +625,25 @@ class ChatbotUI:
         if not agent:
             return
             
+        # Load message metadata from agent's session data if available
+        if hasattr(agent, 'session_data') and agent.session_data and 'message_metadata' in agent.session_data:
+            # Merge with existing metadata in session state, prioritizing stored data
+            stored_metadata = agent.session_data.get('message_metadata', {})
+            if stored_metadata:
+                # Initialize if not exists
+                if 'message_metadata' not in st.session_state:
+                    st.session_state.message_metadata = {}
+                # Update session state with stored metadata
+                for msg_id, meta in stored_metadata.items():
+                    if msg_id not in st.session_state.message_metadata:
+                        st.session_state.message_metadata[msg_id] = meta
+                print(f"Loaded {len(stored_metadata)} message metadata entries from storage")
+                # Debug: Print the first few metadata entries
+                if stored_metadata:
+                    sample_keys = list(stored_metadata.keys())[:2]
+                    for key in sample_keys:
+                        print(f"Sample metadata for {key}: {stored_metadata[key]}")
+            
         # Display messages from agent memory
         if agent.memory and agent.memory.messages:
             for idx, msg in enumerate(agent.memory.messages):
@@ -657,25 +676,42 @@ class ChatbotUI:
                                 agent.session_data = {}
                             if 'message_metadata' not in agent.session_data:
                                 agent.session_data['message_metadata'] = {}
-                            agent.session_data['message_metadata'][message_id] = metadata.copy()  # Make a copy to prevent reference issues
-                            # Ensure storage is updated
+                            agent.session_data['message_metadata'][message_id] = metadata.copy()
+                            
+                            # Ensure storage is updated immediately
                             agent.write_to_storage()
                             print(f"Saved metadata to storage for message {message_id}: {metadata}")
                             
+                            # Also update session state
+                            st.session_state.message_metadata[message_id] = metadata.copy()
+                        
                         # Display media if present in metadata
                         if metadata:
-                            # Log metadata for debugging
-                            print(f"Message {idx} metadata from session state: {metadata}")
+                            # Debug: Log metadata for this message
+                            print(f"Message {message_id} metadata: {metadata}")
                             
                             media_refs = metadata.get('media_refs', [])
-                            # Only show media expander if there are non-text media files
-                            if self.has_non_text_media(media_refs):
+                            if media_refs:
+                                print(f"Found {len(media_refs)} media references for message {message_id}")
+                                
+                                # Always show the expander if there are media references
+                                # We'll handle missing files inside the expander
                                 with st.expander("📎 View Media", expanded=False):
+                                    has_any_media = False
+                                    
                                     for media_ref in media_refs:
                                         if media_ref['type'] != 'text':  # Skip text files
                                             try:
+                                                # Get the stored path and check if it exists
                                                 stored_path = self.manager.media_manager.get_media_path(media_ref['stored_path'])
-                                                if stored_path.exists():
+                                                file_exists = stored_path.exists()
+                                                
+                                                # Debug: Log path information
+                                                print(f"Media file: {media_ref['original_name']}, Path: {stored_path}, Exists: {file_exists}")
+                                                
+                                                # Display the media file if it exists
+                                                if file_exists:
+                                                    has_any_media = True
                                                     st.write(f"**{media_ref['original_name']}**")
                                                     if media_ref['type'] == 'image':
                                                         st.image(str(stored_path))
@@ -684,11 +720,17 @@ class ChatbotUI:
                                                     elif media_ref['type'] == 'audio':
                                                         st.audio(str(stored_path))
                                                 else:
+                                                    # File doesn't exist, show a warning
                                                     st.warning(f"Media file not found: {media_ref['original_name']}")
                                                     logger.warning(f"Media file not found at path: {stored_path}")
                                             except Exception as e:
-                                                logger.error(f"Error displaying media {media_ref['original_name']}: {str(e)}")
-                                                st.error(f"Unable to display media: {media_ref['original_name']}")
+                                                # Log the error and show a message
+                                                logger.error(f"Error displaying media {media_ref.get('original_name', 'unknown')}: {str(e)}")
+                                                st.error(f"Unable to display media: {media_ref.get('original_name', 'unknown')}")
+                                    
+                                    # If no media files were found, show a message
+                                    if not has_any_media:
+                                        st.info("Media files were referenced but could not be found. They may have been deleted or moved.")
                 
                 # Show delete button for the message
                 with del_col:
@@ -996,7 +1038,20 @@ class ChatbotUI:
                         'has_media': True
                     }
                     self.manager.save_message_metadata(agent, message_id, metadata)
-                    msg.metadata = metadata.copy()
+                    
+                    # Also store in agent session data for immediate persistence
+                    if not hasattr(agent, 'session_data') or agent.session_data is None:
+                        agent.session_data = {}
+                    if 'message_metadata' not in agent.session_data:
+                        agent.session_data['message_metadata'] = {}
+                    agent.session_data['message_metadata'][message_id] = metadata.copy()
+                    
+                    # Ensure storage is updated immediately
+                    agent.write_to_storage()
+                    print(f"Saved user message metadata to storage for message {message_id}: {metadata}")
+                    
+                    # Also update session state
+                    st.session_state.message_metadata[message_id] = metadata.copy()
             
             # Get and display bot response with streaming
             with st.chat_message("assistant"):
@@ -1034,7 +1089,20 @@ class ChatbotUI:
                 if metadata:
                     message_id = f"assistant_{len(agent.memory.messages)}"
                     self.manager.save_message_metadata(agent, message_id, metadata)
-                    msg.metadata = metadata.copy()
+                    
+                    # Also store in agent session data for immediate persistence
+                    if not hasattr(agent, 'session_data') or agent.session_data is None:
+                        agent.session_data = {}
+                    if 'message_metadata' not in agent.session_data:
+                        agent.session_data['message_metadata'] = {}
+                    agent.session_data['message_metadata'][message_id] = metadata.copy()
+                    
+                    # Ensure storage is updated immediately
+                    agent.write_to_storage()
+                    print(f"Saved metadata to storage for message {message_id}: {metadata}")
+                    
+                    # Also update session state
+                    st.session_state.message_metadata[message_id] = metadata.copy()
                 
                 # After streaming completes, show the full response with expander if needed
                 preview, full_content = self.format_chat_message(full_response)
@@ -1061,6 +1129,15 @@ class ChatbotUI:
 
     def run(self):
         """Run the chatbot UI"""
+        # Debug: Print metadata state at startup
+        print("=== APP STARTUP: METADATA STATE ===")
+        if 'message_metadata' in st.session_state:
+            print(f"Session state has {len(st.session_state.message_metadata)} metadata entries")
+            if st.session_state.message_metadata:
+                print("First few metadata keys:", list(st.session_state.message_metadata.keys())[:5])
+        else:
+            print("No message_metadata in session state")
+        
         # Check for rerun flags at the start
         if st.session_state.file_upload_rerun:
             st.session_state.file_upload_rerun = False

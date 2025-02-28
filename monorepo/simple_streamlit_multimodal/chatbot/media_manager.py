@@ -58,7 +58,36 @@ class MediaManager:
     
     def get_media_path(self, stored_path: str) -> Path:
         """Get the full path for a stored media file"""
-        return self.media_dir / stored_path
+        try:
+            # Handle both absolute and relative paths
+            if Path(stored_path).is_absolute():
+                # If it's already an absolute path, check if it's within our media directory
+                path = Path(stored_path)
+                if not str(path).startswith(str(self.media_dir)):
+                    logger.warning(f"Absolute path is outside media directory: {path}")
+                    # Try to extract the relative part and reconstruct
+                    try:
+                        # Extract the session_id and filename from the path
+                        parts = path.parts
+                        if len(parts) >= 2:
+                            # Assume the last two parts are session_id/filename
+                            session_id = parts[-2]
+                            filename = parts[-1]
+                            corrected_path = self.media_dir / session_id / filename
+                            logger.info(f"Corrected path to: {corrected_path}")
+                            return corrected_path
+                    except Exception as e:
+                        logger.error(f"Failed to correct path: {e}")
+                return path
+            else:
+                # It's a relative path, construct the full path
+                full_path = self.media_dir / stored_path
+                logger.debug(f"Resolved media path: {stored_path} -> {full_path}")
+                return full_path
+        except Exception as e:
+            logger.error(f"Error resolving media path '{stored_path}': {e}")
+            # Return the original path as a fallback
+            return self.media_dir / stored_path
     
     def cleanup_session(self, session_id: str) -> None:
         """Remove all media files for a session"""

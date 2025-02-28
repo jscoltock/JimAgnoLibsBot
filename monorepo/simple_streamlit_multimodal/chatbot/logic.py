@@ -144,9 +144,35 @@ class ChatbotManager:
             agent.load_session()
             logger.debug(f"Loaded session {session_id}")
             
+            # Debug: Print agent session data
+            if hasattr(agent, 'session_data') and agent.session_data:
+                logger.debug(f"Agent session data keys: {list(agent.session_data.keys())}")
+                if 'message_metadata' in agent.session_data:
+                    metadata_count = len(agent.session_data['message_metadata'])
+                    logger.debug(f"Agent has {metadata_count} message metadata entries")
+                    if metadata_count > 0:
+                        sample_key = next(iter(agent.session_data['message_metadata']))
+                        logger.debug(f"Sample metadata for {sample_key}: {agent.session_data['message_metadata'][sample_key]}")
+            else:
+                logger.debug("Agent has no session data")
+            
             # Load media metadata from our table
             stored_metadata = self._load_media_metadata(session_id)
             logger.debug(f"Loaded media metadata from database: {len(stored_metadata)} messages")
+            
+            # Ensure agent has session_data initialized
+            if not hasattr(agent, 'session_data') or agent.session_data is None:
+                agent.session_data = {}
+            
+            # Initialize message_metadata in session_data if needed
+            if 'message_metadata' not in agent.session_data:
+                agent.session_data['message_metadata'] = {}
+            
+            # Merge database metadata with agent's session data
+            for msg_id, metadata in stored_metadata.items():
+                if msg_id not in agent.session_data['message_metadata']:
+                    agent.session_data['message_metadata'][msg_id] = metadata
+                    logger.debug(f"Added metadata for message {msg_id} from database to agent session data")
             
             # Restore metadata for each message
             if agent.memory and agent.memory.messages:
