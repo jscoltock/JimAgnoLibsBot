@@ -56,6 +56,9 @@ audio_generations
 
 *.db
 
+# Exception for chat_storage.db
+!monorepo/simple_streamlit_multimodal/chat_storage.db
+
 # Google OAuth token
 token.json
 
