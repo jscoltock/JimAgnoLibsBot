@@ -58,30 +58,13 @@ class YouTubeSummaryAgent:
             session_id=self.session_id,
             session_name=self.session_name,
             description=dedent("""\
-                You are an expert YouTube content analyst with a keen eye for detail! 🎓
+                You are an expert YouTube content summarizer with a keen eye for detail! 🎓
                 Your expertise encompasses:
-                
                 - Video content analysis and summarization
-                - Key point extraction and organization
-                - Timestamp creation and organization
-                - Topic identification and categorization
-                - Technical explanation simplification
-                - Educational content breakdown
-                - Visual content description
-                - Narrative structure analysis
             """),
             instructions=dedent("""\
-                Analyze YouTube videos to provide helpful summaries that include:
-                
-                - A brief overview of the video content and purpose
-                - Key timestamps for important moments in the video
-                - Main points and concepts covered in the video
-                - Important takeaways or conclusions
-                
-                Present your analysis in a conversational, helpful manner. Include timestamps in [HH:MM:SS] format 
-                when referencing specific parts of the video. Make your summary easy to read and navigate.
-                
-                Respond in a natural, conversational style as if you're having a chat with the user.
+                Analyze YouTube videos to provide a summary of the video.
+                                
             """),
             markdown=True,
             show_tool_calls=True,
@@ -99,7 +82,7 @@ class YouTubeSummaryAgent:
         agent = self.create_agent()
         
         # Construct a prompt that asks for a comprehensive video analysis
-        prompt = f"Analyze this YouTube video and provide a detailed summary with timestamps and key points: {video_url}"
+        prompt = f"Analyze this YouTube video and provide a detailed summary: {video_url}"
         
         # Run the agent with the prompt
         response = agent.run(prompt, stream=stream)
@@ -131,3 +114,30 @@ if __name__ == "__main__":
     )
     # Print the summary (in a real UI, you would use the summary string differently)
     print(summary) 
+
+#               description=dedent("""\
+#                 You are an expert YouTube content analyst with a keen eye for detail! 🎓
+#                 Your expertise encompasses:
+                
+#                 - Video content analysis and summarization
+#                 - Key point extraction and organization
+#                 - Timestamp creation and organization
+#                 - Topic identification and categorization
+#                 - Technical explanation simplification
+#                 - Educational content breakdown
+#                 - Visual content description
+#                 - Narrative structure analysis
+#             """),
+#             instructions=dedent("""\
+#                 Analyze YouTube videos to provide helpful summaries that include:
+                
+#                 - A brief overview of the video content and purpose
+#                 - Key timestamps for important moments in the video
+#                 - Main points and concepts covered in the video
+#                 - Important takeaways or conclusions
+                
+#                 Present your analysis in a conversational, helpful manner. Include timestamps in [HH:MM:SS] format 
+#                 when referencing specific parts of the video. Make your summary easy to read and navigate.
+                
+#                 Respond in a natural, conversational style as if you're having a chat with the user.
+#             """),
