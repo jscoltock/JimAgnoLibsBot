@@ -377,6 +377,35 @@ class ChatbotUI:
     
     def render_session_selector(self) -> tuple[str, str]:
         """Render session selection UI and return selected session info"""
+        # Initialize return values
+        session_id = None
+        session_name = None
+        
+        # Use custom CSS to reduce spacing in the sidebar
+        st.markdown("""
+        <style>
+        [data-testid="stSidebar"] .block-container {
+            padding-top: 1rem;
+            padding-bottom: 0.5rem;
+        }
+        [data-testid="stSidebar"] hr {
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        [data-testid="stExpander"] {
+            border: none;
+            box-shadow: none;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Create a container at the top for the session name
+        # We'll update this at the end with the correct session name
+        session_header_container = st.sidebar.container()
+        
+        # Reduce spacing after the container
+        st.sidebar.markdown("<hr style='margin-top:0.3rem; margin-bottom:0.3rem'>", unsafe_allow_html=True)
+        
         # Get available sessions
         existing_sessions = self.manager.list_sessions()
         
@@ -388,55 +417,43 @@ class ChatbotUI:
                 name = session.session_data.get("session_name", "Unnamed")
                 session_id_map[name] = session.session_id
                 session_options.append(name)
-                
-        # Display current session info
-        st.sidebar.markdown("---")
-        st.sidebar.markdown(f"**Current Session:** {session_options[0] if not session_id_map else session_options[-1]}")
         
-        # Add model selector
-        st.sidebar.markdown("---")
-        selected_model_name = st.sidebar.selectbox(
-            "Select Model",
-            options=list(AVAILABLE_MODELS.keys()),
-            index=list(AVAILABLE_MODELS.values()).index(st.session_state.selected_model)
-        )
-        st.session_state.selected_model = AVAILABLE_MODELS[selected_model_name]
-        
-        # Load last session
+        # Load last session info for default selection
         last_session_id = self._load_last_session()
-        default_index = 0
-        
-        # Find the index of the last session if it exists
+        initial_session_name = "New Session"
         if last_session_id:
             for session in existing_sessions:
                 if session.session_id == last_session_id:
-                    name = session.session_data.get("session_name", "Unnamed")
-                    if name in session_options:
-                        default_index = session_options.index(name)
+                    initial_session_name = session.session_data.get("session_name", "Unnamed")
+                    session_id = last_session_id  # Set initial session ID
+                    session_name = initial_session_name  # Set initial session name
                     break
         
-        # Create session management expander
+        # Handle session selection inside the expander
         with st.sidebar.expander("💬 Sessions", expanded=False):
             # Show session selector as radio buttons
             selected_option = st.radio(
                 "Select a session",
                 session_options,
-                index=default_index,
+                index=session_options.index(initial_session_name) if initial_session_name in session_options else 0,
                 key="session_selector",
                 label_visibility="collapsed"
             )
             
-            # Handle session selection
+            # Handle new session creation
             if selected_option == "➕ New Session":
-                session_name = st.text_input("Enter a name for the new session", "", key="new_session_name")
-                if session_name.strip():
+                input_name = st.text_input("Enter a name for the new session", "", key="new_session_name")
+                if input_name.strip():
                     if "last_session" not in st.session_state or st.session_state.last_session != "new":
                         st.session_state.last_session = "new"
                         self._save_last_session("")  # Clear last session when creating new
                         st.session_state.session_switch_rerun = True
-                    return None, session_name.strip()
-                st.warning("Please enter a session name")
-                st.stop()
+                    session_id = None  # Signal new session
+                    session_name = input_name.strip()  # Use input name
+                    
+                else:
+                    st.warning("Please enter a session name")
+                    st.stop()
             else:
                 # Get session ID from the mapping
                 session_id = session_id_map[selected_option]
@@ -482,12 +499,26 @@ class ChatbotUI:
                     self._save_last_session(session_id)  # Save the selected session
                     st.session_state.session_switch_rerun = True
         
-        # Display current session info outside the expander
-        st.sidebar.markdown("---")
-        st.sidebar.markdown(f"**Current Session:** {session_name}")
+        # Use a more compact layout for model selection
+        # Add model selector with reduced spacing
+        st.sidebar.markdown("<hr style='margin-top:0.3rem; margin-bottom:0.3rem'>", unsafe_allow_html=True)
         
-        # File uploader in expander
-        with st.sidebar.expander("📎 Upload Files", expanded=True):
+        # Use columns for model selector to make it more compact
+        model_col1, model_col2 = st.sidebar.columns([1, 2])
+        with model_col1:
+            st.markdown("**Model:**", unsafe_allow_html=True)
+        with model_col2:
+            selected_model_name = st.selectbox(
+                "",
+                options=list(AVAILABLE_MODELS.keys()),
+                index=list(AVAILABLE_MODELS.values()).index(st.session_state.selected_model),
+                label_visibility="collapsed"
+            )
+            st.session_state.selected_model = AVAILABLE_MODELS[selected_model_name]
+                
+        # File uploader in expander with reduced spacing
+        st.sidebar.markdown("<hr style='margin-top:0.3rem; margin-bottom:0.3rem'>", unsafe_allow_html=True)
+        with st.sidebar.expander("📎 Upload Files", expanded=False):
             # File uploader with callback - add PDF to accepted types
             _ = st.file_uploader(
                 "Choose files",
@@ -497,8 +528,9 @@ class ChatbotUI:
                 on_change=ChatbotUI.handle_file_upload
             )
         
-        # Tools controls in expander
-        with st.sidebar.expander("🛠️ Tools", expanded=True):
+        # Tools controls in expander with reduced spacing
+        st.sidebar.markdown("<hr style='margin-top:0.3rem; margin-bottom:0.3rem'>", unsafe_allow_html=True)
+        with st.sidebar.expander("🛠️ Tools", expanded=False):
             selected_tool = st.radio(
                 "Select Tool",
                 options=["None", "Web Search", "Youtube Summary", "Research Assistant"],
@@ -525,7 +557,13 @@ class ChatbotUI:
             # Show YouTube Summary instructions when selected
             if selected_tool == "Youtube Summary":
                 st.info("Paste a YouTube URL in the chat to generate a detailed summary with timestamps and key points.")
-        
+                
+        # Now update the container at the top with the FINAL session name
+        # This ensures we display the correct session name after all processing
+        with session_header_container:
+            display_name = session_name if session_name else "New Session"
+            st.markdown(f"<b>Session:</b> {display_name}", unsafe_allow_html=True)
+                
         return session_id, session_name
     
     def log_payload_size(self, agent, prompt, images, videos, audio, metadata):

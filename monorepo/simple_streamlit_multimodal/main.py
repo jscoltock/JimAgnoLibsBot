@@ -32,11 +32,7 @@ def main():
         else:
             st.session_state.last_session = "new"
     
-    # Display current session info
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(f"**Current Session:** {session_name}")
-    
-    # Render chat interface
+    # Render chat interface without additional spacing
     ui.render_chat(st.session_state.agent)
 
 if __name__ == "__main__":
