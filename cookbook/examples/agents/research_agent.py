@@ -30,12 +30,14 @@ from agno.models.google import Gemini
 from agno.tools.duckduckgo import DuckDuckGoTools
 #from agno.tools.searxng import Searxng
 from agno.tools.newspaper4k import Newspaper4kTools
+from agno.tools.searxng import Searxng 
 
 # Initialize the research agent with advanced journalistic capabilities
 research_agent = Agent(
     #model=OpenAIChat(id="gpt-4o"),
     model=Gemini(id="gemini-2.0-flash-exp"),
-    tools=[DuckDuckGoTools(), Newspaper4kTools()],
+    #tools=[DuckDuckGoTools(), Newspaper4kTools()],
+    tools=[Searxng(host="http://localhost:4000"), Newspaper4kTools()],
     description=dedent("""\
         You are an elite investigative journalist with decades of experience at the New York Times.
         Your expertise encompasses: 📰

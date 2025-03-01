@@ -3,7 +3,7 @@ from agno.tools.searxng import Searxng
 
 # Initialize Searxng with your Searxng instance URL
 searxng = Searxng(
-    host="http://localhost:53153",
+    host="http://localhost:4000",
     engines=[],
     fixed_max_results=5,
     news=True,
