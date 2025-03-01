@@ -1,0 +1,27 @@
+2025-03-01 14:00:42,713 - live_api - INFO - Initialized LiveAPIController with video_mode=screen, camera_index=0
+2025-03-01 14:00:42,715 - live_api - INFO - Controller started
+2025-03-01 14:00:42,715 - live_api_component - INFO - Live API started
+2025-03-01 14:00:42,715 - live_api - INFO - Starting LiveAPIController with video_mode=screen
+2025-03-01 14:00:42,919 - live_api - INFO - Started listening to audio
+2025-03-01 14:00:43,031 - live_api - INFO - Started speaking
+2025-03-01 14:00:47,383 - live_api - INFO - Stopped speaking, processing audio
+2025-03-01 14:00:47,891 - live_api - ERROR - Error processing audio: 400 Request contains an invalid argument.
+2025-03-01 14:00:56,411 - live_api - INFO - Started speaking
+2025-03-01 14:00:59,536 - live_api - INFO - Stopped speaking, processing audio
+2025-03-01 14:01:00,047 - live_api - ERROR - Error processing audio: 400 Request contains an invalid argument.
+2025-03-01 14:01:06,110 - live_api - INFO - Stopping controller
+2025-03-01 14:01:06,143 - live_api - INFO - Stopped listening to audio
+2025-03-01 14:01:07,899 - live_api - INFO - Controller stopped
+2025-03-01 14:01:07,899 - live_api_component - INFO - Live API stopped
+2025-03-01 14:01:35,434 - live_api - INFO - Controller started
+2025-03-01 14:01:35,435 - live_api_component - INFO - Live API started
+2025-03-01 14:01:35,437 - live_api - INFO - Starting LiveAPIController with video_mode=screen
+2025-03-01 14:01:35,543 - live_api - ERROR - Error in screen capture: Event loop is closed
+2025-03-01 14:01:35,548 - live_api - INFO - Started listening to audio
+2025-03-01 14:01:37,476 - live_api - INFO - Started speaking
+2025-03-01 14:01:41,703 - live_api - INFO - Stopped speaking, processing audio
+2025-03-01 14:01:41,703 - live_api - ERROR - Error processing audio: Event loop is closed
+2025-03-01 14:01:42,273 - live_api - INFO - Started speaking
+2025-03-01 14:01:43,625 - live_api - INFO - Stopped speaking, processing audio
+2025-03-01 14:01:43,626 - live_api - ERROR - Error processing audio: Event loop is closed
+2025-03-01 14:01:51,450 - live_api_component - ERROR - Error cleaning up Live API: st.session_state has no attribute "live_api_controller". Did you forget to initialize it? More info: https://docs.streamlit.io/develop/concepts/architecture/session-state#initialization

@@ -663,6 +663,19 @@ class ChatbotUI:
             metadata=metadata
         )
 
+    def render_live_api_button(self):
+        """Render the Live API toggle directly in the sidebar."""
+        # Import the Live API toggle component
+        try:
+            from ui.live_api_component import render_live_api_toggle
+            # Render the toggle directly in the sidebar
+            with st.sidebar:
+                st.markdown("### Live API")
+                render_live_api_toggle()
+        except Exception as e:
+            logger.error(f"Error rendering Live API toggle: {e}")
+            st.sidebar.error("Live API component could not be loaded.")
+
     def render_chat(self, agent):
         """Render chat interface for the given agent"""
         if not agent:
@@ -809,6 +822,11 @@ class ChatbotUI:
                             )
                         except Exception as e:
                             st.error(f"Error displaying text content from {file['name']}: {str(e)}")
+        
+        # Add Live API button in the sidebar
+        with st.sidebar:
+            st.markdown("### Tools")
+            self.render_live_api_button()
         
         # Chat input
         if prompt := st.chat_input("Type your message here..."):
@@ -967,8 +985,6 @@ class ChatbotUI:
                                     message_placeholder.markdown(preview)
                                     with st.expander("Show full response", expanded=False):
                                         st.markdown(full_content)
-                                else:
-                                    message_placeholder.markdown(full_content)
                             
                             # Add YouTube summary results to memory with simple metadata
                             assistant_message = Message(

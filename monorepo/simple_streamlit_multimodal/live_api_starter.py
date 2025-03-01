@@ -158,21 +158,23 @@ def test_camera_access(camera_index):
 
 
 class AudioLoop:
-    def __init__(self, video_mode=DEFAULT_MODE, camera_index=0):
+    def __init__(self, video_mode=DEFAULT_MODE, camera_index=0, stop_event=None):
         self.video_mode = video_mode
         self.camera_index = camera_index
+        self.stop_event = stop_event  # External stop event
 
         self.audio_in_queue = None
         self.out_queue = None
 
         self.session = None
-
-        self.send_text_task = None
-        self.receive_audio_task = None
-        self.play_audio_task = None
+        self.audio_stream = None
 
     async def send_text(self):
         while True:
+            # Check if stop event is set
+            if self.stop_event and self.stop_event.is_set():
+                break
+                
             text = await asyncio.to_thread(
                 input,
                 "message > ",
@@ -403,14 +405,27 @@ class AudioLoop:
                 tg.create_task(self.receive_audio())
                 tg.create_task(self.play_audio())
 
-                await send_text_task
-                raise asyncio.CancelledError("User requested exit")
+                # Check for external stop event
+                while True:
+                    if self.stop_event and self.stop_event.is_set():
+                        raise asyncio.CancelledError("External stop requested")
+                    
+                    # Check if send_text_task is done
+                    if send_text_task.done():
+                        raise asyncio.CancelledError("User requested exit")
+                        
+                    await asyncio.sleep(0.1)
 
         except asyncio.CancelledError:
             pass
         except ExceptionGroup as EG:
-            self.audio_stream.close()
+            if self.audio_stream:
+                self.audio_stream.close()
             traceback.print_exception(EG)
+        finally:
+            # Clean up resources
+            if self.audio_stream:
+                self.audio_stream.close()
 
 
 if __name__ == "__main__":
