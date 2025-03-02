@@ -55,7 +55,7 @@ def start_live_api():
         
         # Start the process
         process = subprocess.Popen(
-            [sys.executable, str(script_path), "--camera-index", "1"],
+            [sys.executable, str(script_path), "--camera-index", "0"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

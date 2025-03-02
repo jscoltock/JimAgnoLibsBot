@@ -317,3 +317,141 @@ Agno logs which model an agent used so we can prioritize updates to the most pop
 <p align="left">
   <a href="#top">⬆️ Back to Top</a>
 </p>
+
+# Video Input Tools for Live API
+
+This repository contains tools for detecting and selecting video inputs (cameras and screens) for the Live API component.
+
+## Overview
+
+The Live API component in the original implementation only supports camera input with a hardcoded camera index (1). These tools extend the functionality to:
+
+1. Detect all available camera devices on your system
+2. Detect all available screen capture options
+3. Select between camera and screen inputs
+4. Choose which camera to use (if multiple are available)
+
+## Tools Included
+
+### 1. Command-Line Tools
+
+- **`check_video_inputs.py`**: Comprehensive tool that checks both camera and screen inputs
+- **`list_camera_devices.py`**: Standalone tool for detecting camera devices
+- **`list_screen_devices.py`**: Standalone tool for detecting screen capture options
+
+### 2. Streamlit App
+
+- **`video_input_detector_app.py`**: Interactive Streamlit app for detecting and previewing video inputs
+
+### 3. Enhanced Live API Component
+
+- **`enhanced_live_api_component.py`**: Drop-in replacement for the original Live API component with input selection options
+
+## Usage
+
+### Detecting Video Inputs
+
+To detect all available video inputs on your system:
+
+```bash
+python check_video_inputs.py
+```
+
+To show previews of cameras:
+
+```bash
+python check_video_inputs.py --camera-preview
+```
+
+To show previews of screens:
+
+```bash
+python check_video_inputs.py --screen-preview
+```
+
+### Using the Streamlit App
+
+To run the interactive Streamlit app:
+
+```bash
+streamlit run video_input_detector_app.py
+```
+
+This app provides a user-friendly interface for:
+- Scanning for camera devices
+- Scanning for screen capture options
+- Previewing cameras and screens
+- Viewing command-line options for the Live API
+
+### Using the Enhanced Live API Component
+
+The enhanced Live API component is now integrated into the main Streamlit multi-modal app. It provides:
+- A dropdown to select the input mode (camera, screen, or none)
+- A number input to select the camera index (when in camera mode)
+- Start/Stop buttons for the Live API
+
+If you want to use it in your own Streamlit app:
+
+```python
+from monorepo.simple_streamlit_multimodal.ui.enhanced_live_api_component import render_enhanced_live_api_toggle
+
+# In your Streamlit app
+render_enhanced_live_api_toggle()
+```
+
+This component provides a dropdown to select the input mode and camera index.
+
+## How It Works
+
+### Input Selection
+
+The Live API starter script (`live_api_starter.py`) supports three input modes:
+
+1. **Camera Mode**: Uses OpenCV to capture frames from a webcam
+   - Command: `--mode camera --camera-index INDEX`
+   - Default mode when no mode is specified
+
+2. **Screen Mode**: Uses MSS to capture screenshots of the primary monitor
+   - Command: `--mode screen`
+
+3. **None Mode**: Audio only, no video input
+   - Command: `--mode none`
+
+The enhanced component allows selecting between these modes through the UI.
+
+## Requirements
+
+- Python 3.7+
+- OpenCV (`opencv-python`)
+- MSS (`mss`)
+- Streamlit (`streamlit`)
+- PIL (`pillow`)
+- NumPy (`numpy`)
+
+## Installation
+
+```bash
+pip install opencv-python mss streamlit pillow numpy
+```
+
+## Troubleshooting
+
+### Camera Issues
+
+If you're having trouble with camera access:
+
+1. Run `python list_camera_devices.py --preview` to test all cameras
+2. Try different camera indices (0, 1, 2, etc.)
+3. Check if your camera is being used by another application
+
+### Screen Capture Issues
+
+If you're having trouble with screen capture:
+
+1. Run `python list_screen_devices.py --preview` to test screen capture
+2. Make sure you have permission to capture the screen
+3. On Windows, you might need to run as administrator
+
+## License
+
+This project is licensed under the same license as the original Live API component.
