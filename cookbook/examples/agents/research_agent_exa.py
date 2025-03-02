@@ -32,7 +32,7 @@ research_scholar = Agent(
     model=OpenAIChat(id="gpt-4o"),
     tools=[
         ExaTools(
-            start_published_date=datetime.now().strftime("%Y-%m-%d"), type="keyword"
+            start_published_date=datetime.now().strftime("%Y-%m-%d"), type="keyword",api_key="433d44af-0340-495b-971b-b361f3e834b0"
         )
     ],
     description=dedent("""\
@@ -126,7 +126,7 @@ research_scholar = Agent(
 # Example usage with academic research request
 if __name__ == "__main__":
     research_scholar.print_response(
-        "Analyze recent developments in quantum computing architectures",
+        "Analyze the current state of Modern Monetary Theory",
         stream=True,
     )
 
