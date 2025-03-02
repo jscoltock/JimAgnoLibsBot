@@ -670,8 +670,9 @@ class ChatbotUI:
             from ui.enhanced_live_api_component import render_enhanced_live_api_toggle
             # Render the enhanced toggle directly in the sidebar
             with st.sidebar:
-                st.markdown("### Live API")
-                render_enhanced_live_api_toggle()
+                # Place the Live API functionality inside an expander
+                with st.expander("Live API", expanded=False):
+                    render_enhanced_live_api_toggle()
         except Exception as e:
             logger.error(f"Error rendering Live API toggle: {e}")
             st.sidebar.error("Live API component could not be loaded.")
@@ -825,7 +826,6 @@ class ChatbotUI:
         
         # Add Live API button in the sidebar
         with st.sidebar:
-            st.markdown("### Tools")
             self.render_live_api_button()
         
         # Chat input
