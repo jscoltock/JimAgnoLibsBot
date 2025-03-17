@@ -1,7 +1,10 @@
 from agno.agent import Agent, RunResponse  # noqa
 from agno.models.ollama import Ollama
+import os
 
-agent = Agent(model=Ollama(id="llama3.1:8b"), markdown=True)
+os.environ["OLLAMA_HOST"] = "http://localhost:11434"
+
+agent = Agent(model=Ollama(id="gemma3:12b"), markdown=True)
 
 # Get the response in a variable
 # run: RunResponse = agent.run("Share a 2 sentence horror story")
